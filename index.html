@@ -86,44 +86,47 @@
         .chat-message .delete-chat-msg-btn:hover {
             color: #c53030; 
         }
-        .poll-option {
-            background-color: #4a5568; 
-            padding: 0.5rem;
-            margin-bottom: 0.5rem;
-            border-radius: 0.375rem;
+         /* Toggle Switch Styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px; /* Largura do switch */
+            height: 24px; /* Altura do switch */
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
             cursor: pointer;
-            transition: background-color 0.2s;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px; /* Altura / 2 para bordas totalmente arredondadas */
         }
-        .poll-option:hover {
-            background-color: #2d3748; 
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px; /* Altura do botão interno */
+            width: 18px; /* Largura do botão interno */
+            left: 3px; /* Posição inicial */
+            bottom: 3px; /* Posição inicial */
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
         }
-        .poll-option.voted {
-            background-color: #38a169; 
-            cursor: default;
+        input:checked + .slider {
+            background-color: #4CAF50; /* Verde quando ligado */
         }
-        .poll-result-bar {
-            background-color: #4299e1; 
-            height: 100%;
-            border-radius: 0.25rem;
-            text-align: right;
-            padding-right: 5px;
-            color: white;
-            font-size: 0.75rem;
-            line-height: 1.25rem; 
+        input:checked + .slider:before {
+            transform: translateX(26px); /* Deslocamento para a direita (largura do switch - largura do botão interno - 2*padding lateral) */
         }
-        .poll-option-result-container {
-            display: flex;
-            align-items: center;
-            margin-bottom: 0.25rem;
-        }
-        .poll-option-label {
-            flex-grow: 1;
-        }
-        .poll-option-percentage {
-            width: 50px; 
-            text-align: right;
-            margin-left: 10px;
-        }
+
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100">
@@ -255,6 +258,7 @@
         const defaultRoles = ['Admin', 'Moderador', 'VIP', 'Membro']; 
         let currentRoleColors = {}; 
         let serverRolePermissionsConfig = {}; 
+        let registrationsOpen = true; // Default, will be updated from Firestore
 
         const views = {
             loading: document.getElementById('loading-view'),
@@ -290,9 +294,6 @@
         const newTopicContentInput = document.getElementById('new-topic-content');
         const newTopicTitleInput = document.getElementById('new-topic-title');
         const newTopicCommandInput = document.getElementById('new-topic-command');
-        const newTopicPollQuestionInput = document.getElementById('new-topic-poll-question');
-        const pollOptionsContainer = document.getElementById('poll-options-container');
-
 
         const myProfileNicknameInput = document.getElementById('my-profile-nickname');
         const myProfileSteamUrlInput = document.getElementById('my-profile-steam-url');
@@ -312,6 +313,9 @@
         
         const adminForumNameInput = document.getElementById('admin-forum-name');
         const saveForumNameBtn = document.getElementById('save-forum-name-btn');
+        const adminRegistrationsToggle = document.getElementById('admin-registrations-toggle');
+        const saveRegistrationSettingsBtn = document.getElementById('save-registration-settings-btn');
+
 
         const csServersListAdmin = document.getElementById('cs-servers-list-admin');
         const addCsServerBtn = document.getElementById('add-cs-server-btn');
@@ -359,19 +363,19 @@
         }
 
         function hasPermission(permissionKey) {
-            console.log(`Checking permission: ${permissionKey}`);
+            console.log(`[Client] Checking permission: ${permissionKey}`);
             if (!userProfileData || !userProfileData.role) {
-                console.log("Permission denied: No userProfileData or role.");
+                console.log("[Client] Permission denied: No userProfileData or role.");
                 return false;
             }
             if (userProfileData.role === 'Admin') {
-                console.log("Permission granted: User is Admin.");
+                console.log("[Client] Permission GRANTED: User is Admin.");
                 return true; 
             }
             
             const rolePerms = serverRolePermissionsConfig[userProfileData.role];
             const hasPerm = rolePerms && rolePerms[permissionKey] === true;
-            console.log(`Permission for ${permissionKey} for role ${userProfileData.role}: ${hasPerm}`);
+            console.log(`[Client] Permission for ${permissionKey} for role ${userProfileData.role}: ${hasPerm}. RolePerms:`, rolePerms);
             return hasPerm;
         }
 
@@ -399,7 +403,11 @@
             if(showRegisterViewLink) {
                 showRegisterViewLink.addEventListener('click', (e) => { 
                     e.preventDefault(); 
-                    showView('register'); 
+                    if (registrationsOpen) {
+                        showView('register'); 
+                    } else {
+                        showModal("Novos cadastros estão temporariamente desabilitados.", "info");
+                    }
                 });
             }
             if(showLoginViewLink) {
@@ -422,6 +430,9 @@
             }
             if (saveForumNameBtn) {
                 saveForumNameBtn.addEventListener('click', saveForumName);
+            }
+            if (saveRegistrationSettingsBtn) {
+                saveRegistrationSettingsBtn.addEventListener('click', saveRegistrationSettings);
             }
             if (addCsServerBtn) {
                 addCsServerBtn.addEventListener('click', () => openCsServerModal());
@@ -518,32 +529,34 @@
                                 role: 'Membro' 
                             };
                             await setDoc(userProfileRef, userProfileData);
-                            console.log("New user profile created:", userProfileData);
+                            console.log("[Auth] New user profile created:", JSON.stringify(userProfileData));
                         } catch (error) {
-                            console.error("Error creating user profile:", error);
+                            console.error("[Auth] Error creating user profile:", error);
                             showModal("Erro ao criar perfil de usuário: " + error.message);
                             userProfileData = { role: 'Membro', lastSeen: Timestamp.now() }; 
                         }
                     } else {
                         userProfileData = userProfileSnap.data();
-                        console.log("User profile loaded:", userProfileData);
+                        console.log("[Auth] User profile loaded:", JSON.stringify(userProfileData));
                     }
                     
                     isAdmin = (userProfileData.role === 'Admin'); 
-                    console.log("Is Admin:", isAdmin);
+                    console.log("[Auth] User role from profile:", userProfileData.role);
+                    console.log("[Auth] isAdmin determined as:", isAdmin);
 
                     userDisplay.textContent = `Bem-vindo, ${userProfileData.nickname || userProfileData.displayName || user.email}`;
                     currentUserIdDisplay.style.display = isAdmin ? 'inline-block' : 'none'; 
                     currentUserIdDisplay.textContent = isAdmin ? `User ID: ${currentUserId}` : '';
 
                     loginNav.style.display = 'none';
-                    registerNav.style.display = 'none';
+                    // registerNav will be controlled by registrationsOpen status from serverConfig
                     logoutNav.style.display = 'inline-block';
                     myProfileNav.style.display = 'inline-block';
 
-                    await loadServerConfig(); // Load server config first to get role permissions
-                    console.log("Server role permissions config after load:", serverRolePermissionsConfig);
-                    console.log("Current user role for permission check:", userProfileData.role);
+                    await loadServerConfig(); 
+                    console.log("[Auth] Server role permissions config after load:", JSON.stringify(serverRolePermissionsConfig));
+                    console.log("[Auth] Current user role for permission check (after server config):", userProfileData.role);
+                    console.log("[Auth] Current user's specific permissions:", JSON.stringify(currentRolePermissions));
 
 
                     if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) { 
@@ -570,7 +583,13 @@
                     userDisplay.textContent = 'Você não está logado.';
                     currentUserIdDisplay.style.display = 'none';
                     loginNav.style.display = 'inline-block';
-                    registerNav.style.display = 'inline-block';
+                    // registerNav will be controlled by registrationsOpen status (loaded by loadServerConfig before this else block in ideal scenario)
+                    // However, loadServerConfig is called for logged-in users. Need to handle this.
+                    if (registrationsOpen) {
+                        registerNav.style.display = 'inline-block';
+                    } else {
+                        registerNav.style.display = 'none';
+                    }
                     logoutNav.style.display = 'none';
                     myProfileNav.style.display = 'none';
                     adminControls.style.display = 'none';
@@ -628,6 +647,10 @@
 
         document.getElementById('register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (!registrationsOpen) {
+                showModal("Novos cadastros estão temporariamente desabilitados.", "error");
+                return;
+            }
             if (!auth) { showModal("Serviço de autenticação indisponível."); return; }
             const email = e.target.email.value;
             const password = e.target.password.value;
@@ -663,7 +686,14 @@
         });
         
         loginNav.addEventListener('click', (e) => { e.preventDefault(); showView('login'); });
-        registerNav.addEventListener('click', (e) => { e.preventDefault(); showView('register'); });
+        registerNav.addEventListener('click', (e) => { 
+            e.preventDefault(); 
+            if (registrationsOpen) {
+                showView('register');
+            } else {
+                showModal("Novos cadastros estão temporariamente desabilitados.", "info");
+            }
+        });
 
         let categoriesCol, topicsCol, postsCol, userProfilesCol, serverConfigDocRef, chatMessagesCol;
         if (db) {
@@ -700,9 +730,11 @@
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     adminForumNameInput.value = data.forumName || 'Negativa Server - Fórum';
+                    adminRegistrationsToggle.checked = data.registrationsOpen === undefined ? true : data.registrationsOpen;
                     renderAdminCsServersList(data.csServers || []);
                 } else {
                     adminForumNameInput.value = 'Negativa Server - Fórum'; 
+                    adminRegistrationsToggle.checked = true; // Default to open
                     renderAdminCsServersList([]);
                 }
             } catch (error) {
@@ -728,6 +760,23 @@
                 showModal("Erro ao salvar nome do fórum: " + error.message, "error");
             }
         }
+        
+        async function saveRegistrationSettings() {
+            if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
+                showModal("Você não tem permissão para alterar as configurações de registro.", "error"); return;
+            }
+            const newRegistrationsOpen = adminRegistrationsToggle.checked;
+            try {
+                await setDoc(serverConfigDocRef, { registrationsOpen: newRegistrationsOpen }, { merge: true });
+                registrationsOpen = newRegistrationsOpen; // Update local state
+                registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
+                showModal(`Cadastros ${newRegistrationsOpen ? 'abertos' : 'fechados'} com sucesso!`, "success");
+            } catch (error) {
+                console.error("Error saving registration settings:", error);
+                showModal("Erro ao salvar configurações de registro: " + error.message, "error");
+            }
+        }
+
         
         function renderAdminCsServersList(servers = []) {
             csServersListAdmin.innerHTML = '';
@@ -1134,39 +1183,16 @@
             const title = newTopicTitleInput.value; 
             const content = newTopicContentInput.value; 
             const commandToCopy = newTopicCommandInput.value.trim();
-            const pollQuestion = newTopicPollQuestionInput.value.trim();
-            const pollOptions = [];
-            for (let i = 1; i <= 4; i++) {
-                const optionInput = document.getElementById(`new-topic-poll-option-${i}`);
-                if (optionInput && optionInput.value.trim()) {
-                    pollOptions.push({ text: optionInput.value.trim(), votes: 0 });
-                }
-            }
-
+            // Poll creation removed
 
             if (!title.trim() || !content.trim()) {
                 showModal("Título e conteúdo do primeiro post são obrigatórios.");
                 return;
             }
-            if (pollQuestion && pollOptions.length < 2) {
-                showModal("Se uma pergunta de enquete for fornecida, pelo menos duas opções são necessárias.", "error");
-                return;
-            }
-
 
             const now = Timestamp.now();
             const userDisplayName = userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0];
             
-            let pollData = null;
-            if (pollQuestion && pollOptions.length >= 2) {
-                pollData = {
-                    question: pollQuestion,
-                    options: pollOptions,
-                    voters: {} 
-                };
-            }
-
-
             try {
                 const topicRef = await addDoc(topicsCol, {
                     categoryId: currentCategoryId,
@@ -1176,8 +1202,8 @@
                     replyCount: 0, 
                     lastReplyAt: now,
                     lastReplyBy: currentUserId,
-                    viewCount: 0,
-                    poll: pollData 
+                    viewCount: 0
+                    // poll: null // Ensure poll field is not set or is null
                 });
 
                 await addDoc(postsCol, {
@@ -1218,7 +1244,8 @@
             newTopicTitleInput.value = ''; 
             newTopicContentInput.value = ''; 
             newTopicCommandInput.value = '';
-            newTopicPollQuestionInput.value = '';
+            // Clear poll inputs if they were there
+            if(document.getElementById('new-topic-poll-question')) document.getElementById('new-topic-poll-question').value = '';
             for (let i = 1; i <= 4; i++) {
                 const optionInput = document.getElementById(`new-topic-poll-option-${i}`);
                 if (optionInput) optionInput.value = '';
@@ -1393,7 +1420,7 @@
 
         let currentTopicId = null;
         let currentTopicTitle = '';
-        let currentTopicPollData = null; 
+        // Removed currentTopicPollData
 
         document.getElementById('create-post-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1475,15 +1502,8 @@
                 {name: topicTitle, view: 'topic', id: topicId}
             ]);
 
-            const topicRef = doc(topicsCol, topicId);
-            const topicDocSnap = await getDoc(topicRef);
-            currentTopicPollData = null; 
-            if (topicDocSnap.exists() && topicDocSnap.data().poll) {
-                currentTopicPollData = topicDocSnap.data().poll;
-                renderPoll(topicId, currentTopicPollData);
-            } else {
-                document.getElementById('topic-poll-container').innerHTML = ''; 
-            }
+            // Clear poll container as polls are removed
+            document.getElementById('topic-poll-container').innerHTML = ''; 
 
 
             postsList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando postagens...</p>';
@@ -1812,7 +1832,7 @@
         
         // --- Role Color & Permissions Management ---
         async function loadRoleColorSettings() {
-            if (!db || !serverConfigDocRef || !hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) return;
+            if (!db || !serverConfigDocRef || !hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) return; 
             adminRoleColorSettings.innerHTML = '<p class="text-gray-400">Carregando configurações de cores...</p>';
             try {
                 const docSnap = await getDoc(serverConfigDocRef);
@@ -1854,7 +1874,7 @@
         }
 
         async function saveRoleColors() {
-            if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
+            if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) { 
                  showModal("Você não tem permissão para gerenciar configurações.", "error"); return;
             }
             const newRoleColors = {};
@@ -1890,6 +1910,8 @@
                     if (configData.roleColors) {
                         currentRoleColors = configData.roleColors;
                     }
+                    registrationsOpen = configData.registrationsOpen === undefined ? true : configData.registrationsOpen;
+
                     if (configData.rolePermissions) {
                         serverRolePermissionsConfig = configData.rolePermissions;
                         if (userProfileData && userProfileData.role) {
@@ -1926,6 +1948,7 @@
                     }
                 } else { 
                     currentRoleColors = {}; 
+                    registrationsOpen = true; // Default if config doesn't exist
                     serverRolePermissionsConfig = {};
                      defaultRoles.forEach(role => {
                         serverRolePermissionsConfig[role] = {};
@@ -1945,7 +1968,11 @@
                     serverInfoBannerContainer.innerHTML = '';
                     if (isAdmin && adminPermissionsSettings) loadRolePermissionsSettings(); 
                 }
-                console.log("Server config loaded/updated. Current user role:", userProfileData?.role, "Permissions:", currentRolePermissions);
+                // Update UI based on registrationsOpen status
+                registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
+                if(adminRegistrationsToggle && isAdmin) adminRegistrationsToggle.checked = registrationsOpen;
+
+                console.log("[Client] Server config loaded/updated. Registrations Open:", registrationsOpen, "Current user role:", userProfileData?.role, "Permissions:", currentRolePermissions);
             }, (error) => {
                 console.error("Error loading server config:", error);
             });
@@ -2097,98 +2124,6 @@
                 showModal("Erro ao apagar mensagem do chat: " + error.message, "error");
             }
         }
-
-        // --- Poll Functionality ---
-        function renderPoll(topicId, pollData) {
-            const pollContainer = document.getElementById('topic-poll-container');
-            if (!pollContainer || !pollData) {
-                if (pollContainer) pollContainer.innerHTML = '';
-                return;
-            }
-
-            const userHasVoted = pollData.voters && pollData.voters[currentUserId] !== undefined;
-            const totalVotes = pollData.options.reduce((sum, opt) => sum + (opt.votes || 0), 0);
-
-            let pollHtml = `<div class="bg-gray-700 p-4 rounded-lg mb-6">
-                                <h3 class="text-lg font-semibold text-gray-100 mb-3">${pollData.question}</h3>
-                                <div class="space-y-2">`;
-
-            pollData.options.forEach((option, index) => {
-                if (userHasVoted || hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) { 
-                    const percentage = totalVotes > 0 ? ((option.votes || 0) / totalVotes * 100).toFixed(1) : 0;
-                    pollHtml += `
-                        <div class="poll-option-result-container">
-                            <div class="poll-option-label text-sm text-gray-300">${option.text} (${option.votes || 0} votos)</div>
-                            <div class="w-full bg-gray-600 rounded h-5 ml-2 overflow-hidden">
-                                <div class="poll-result-bar" style="width: ${percentage}%;">${percentage}%</div>
-                            </div>
-                        </div>
-                    `;
-                } else { 
-                    pollHtml += `
-                        <div class="poll-option" data-topic-id="${topicId}" data-option-index="${index}">
-                            ${option.text}
-                        </div>
-                    `;
-                }
-            });
-            pollHtml += `</div>`;
-            if (userHasVoted) {
-                 const votedOptionIndex = pollData.voters[currentUserId];
-                 pollHtml += `<p class="text-xs text-green-400 mt-2">Você votou em: "${pollData.options[votedOptionIndex].text}"</p>`;
-            }
-             pollHtml += `<p class="text-xs text-gray-400 mt-2">Total de votos: ${totalVotes}</p></div>`;
-            pollContainer.innerHTML = pollHtml;
-
-            if (!userHasVoted && !hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
-                pollContainer.querySelectorAll('.poll-option').forEach(el => {
-                    el.addEventListener('click', handlePollVote);
-                });
-            }
-        }
-
-        async function handlePollVote(event) {
-            if (!currentUser) {
-                showModal("Você precisa estar logado para votar.", "error");
-                return;
-            }
-            const topicId = event.target.dataset.topicId;
-            const optionIndex = parseInt(event.target.dataset.optionIndex);
-            const topicRef = doc(topicsCol, topicId);
-
-            try {
-                await runTransaction(db, async (transaction) => {
-                    const topicSnap = await transaction.get(topicRef);
-                    if (!topicSnap.exists()) {
-                        throw "Tópico não encontrado.";
-                    }
-                    const topicData = topicSnap.data();
-                    const poll = topicData.poll;
-
-                    if (!poll || !poll.options || !poll.voters) {
-                        throw "Dados da enquete inválidos.";
-                    }
-                    if (poll.voters[currentUserId] !== undefined) {
-                        showModal("Você já votou nesta enquete.", "info");
-                        renderPoll(topicId, poll); 
-                        return; 
-                    }
-
-                    poll.options[optionIndex].votes = (poll.options[optionIndex].votes || 0) + 1;
-                    poll.voters[currentUserId] = optionIndex;
-                    
-                    transaction.update(topicRef, { poll: poll });
-                });
-                showModal("Voto registrado com sucesso!", "success");
-                const updatedTopicSnap = await getDoc(topicRef);
-                if (updatedTopicSnap.exists()) {
-                    renderPoll(topicId, updatedTopicSnap.data().poll);
-                }
-            } catch (error) {
-                console.error("Error voting in poll:", error);
-                showModal("Erro ao registrar voto: " + error, "error");
-            }
-        }
         
         // --- Role Permissions Management (Admin) ---
         function loadRolePermissionsSettings() {
@@ -2271,7 +2206,9 @@
                     if (checkbox) { 
                         newPermissions[role][permValue] = checkbox.checked;
                     } else if (permValue === PERMISSIONS.MANAGE_ROLES_PERMISSIONS && role !== 'Admin') {
-                        newPermissions[role][permValue] = false;
+                        // If the MANAGE_ROLES_PERMISSIONS checkbox itself isn't rendered for non-Admin roles (which it is currently)
+                        // this logic might need adjustment. For now, assume it's always false unless explicitly checked.
+                        newPermissions[role][permValue] = false; 
                     }
                 });
             });
@@ -2420,7 +2357,15 @@
                                 <label for="admin-forum-name" class="block text-sm font-medium text-gray-300 mb-1">Nome do Fórum</label>
                                 <input type="text" id="admin-forum-name" class="w-full p-2 bg-gray-600 border border-gray-500 rounded-md text-gray-100 placeholder-gray-400">
                             </div>
-                            <button id="save-forum-name-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Nome do Fórum</button>
+                             <div class="mb-3 flex items-center">
+                                <label for="admin-registrations-toggle" class="block text-sm font-medium text-gray-300 mr-3">Permitir Novos Cadastros:</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="admin-registrations-toggle">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <button id="save-forum-name-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150 mr-2">Salvar Nome</button>
+                            <button id="save-registration-settings-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Config. Cadastro</button>
                         </div>
 
                         <form id="create-category-form" class="space-y-4 mb-6 border-b border-gray-700 pb-4">
@@ -2579,17 +2524,6 @@
                     <input type="text" id="new-topic-command" name="commandToCopy" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400" placeholder="Ex: connect seu.ip.aqui:porta">
                 </div>
                 
-                <div class="mb-4 border-t border-gray-700 pt-4">
-                    <label for="new-topic-poll-question" class="block text-sm font-medium text-gray-300 mb-1">Pergunta da Enquete (Opcional)</label>
-                    <input type="text" id="new-topic-poll-question" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400">
-                    <div id="poll-options-container" class="mt-2 space-y-2">
-                        <input type="text" id="new-topic-poll-option-1" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 text-sm" placeholder="Opção 1 da enquete">
-                        <input type="text" id="new-topic-poll-option-2" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 text-sm" placeholder="Opção 2 da enquete">
-                        <input type="text" id="new-topic-poll-option-3" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 text-sm" placeholder="Opção 3 da enquete (Opcional)">
-                        <input type="text" id="new-topic-poll-option-4" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 text-sm" placeholder="Opção 4 da enquete (Opcional)">
-                    </div>
-                </div>
-
                 <div class="flex justify-end space-x-3 items-center">
                     <button type="button" id="suggest-topic-title-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-md transition duration-150 text-sm">
                         Sugerir Título com IA ✨
