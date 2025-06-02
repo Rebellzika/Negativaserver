@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-T-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="forum-title-tag">Negativa Server - Fórum</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -23,7 +23,7 @@
             background-color: #fefefe; color: #333; margin: auto; padding: 20px;
             border: 1px solid #888; width: 80%; max-width: 500px; border-radius: 8px;
         }
-        .modal-content-lg { 
+        .modal-content-lg {
              max-width: 700px;
         }
         .modal-close {
@@ -33,7 +33,7 @@
             color: black; text-decoration: none; cursor: pointer;
         }
         .loading-spinner, .gemini-loading-spinner {
-            border: 4px solid #f3f3f3; border-top: 4px solid #3498db; 
+            border: 4px solid #f3f3f3; border-top: 4px solid #3498db;
             border-radius: 50%; width: 40px; height: 40px;
             animation: spin 1s linear infinite; margin: 20px auto;
         }
@@ -51,25 +51,25 @@
             font-size: 0.75em;
             font-weight: bold;
             margin-left: 0.5em;
-            color: white; 
-            background-color: #6b7280; 
+            color: white;
+            background-color: #6b7280; /* Default color */
         }
         #chat-messages {
-            height: 200px; 
+            height: 200px;
             overflow-y: auto;
-            border: 1px solid #4a5568; 
+            border: 1px solid #4a5568;
             padding: 8px;
-            border-radius: 0.375rem; 
+            border-radius: 0.375rem;
             margin-bottom: 8px;
-            background-color: #2d3748; 
+            background-color: #2d3748;
         }
         .chat-message {
             margin-bottom: 4px;
             padding: 4px;
             border-radius: 0.25rem;
-            display: flex; 
-            justify-content: space-between; 
-            align-items: flex-start; 
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
         }
         .chat-message .username {
             font-weight: bold;
@@ -77,21 +77,21 @@
         .chat-message .delete-chat-msg-btn {
             background: none;
             border: none;
-            color: #f56565; 
+            color: #f56565;
             cursor: pointer;
             font-size: 0.75rem;
             padding: 0 0.25rem;
             margin-left: 0.5rem;
         }
         .chat-message .delete-chat-msg-btn:hover {
-            color: #c53030; 
+            color: #c53030;
         }
          /* Toggle Switch Styles */
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 50px; 
-            height: 24px; 
+            width: 50px;
+            height: 24px;
         }
         .toggle-switch input {
             opacity: 0;
@@ -107,24 +107,40 @@
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
-            border-radius: 24px; 
+            border-radius: 24px;
         }
         .slider:before {
             position: absolute;
             content: "";
-            height: 18px; 
-            width: 18px; 
-            left: 3px; 
-            bottom: 3px; 
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
             background-color: white;
             transition: .4s;
             border-radius: 50%;
         }
         input:checked + .slider {
-            background-color: #4CAF50; 
+            background-color: #4CAF50;
         }
         input:checked + .slider:before {
-            transform: translateX(26px); 
+            transform: translateX(26px);
+        }
+        /* Admin Panel Section Styling */
+        .admin-section {
+            background-color: rgba(42, 50, 66, 0.5); /* bg-gray-800 with opacity or a slightly different shade */
+            padding: 1.5rem; /* p-6 */
+            border-radius: 0.5rem; /* rounded-lg */
+            margin-bottom: 1.5rem; /* mb-6 */
+            border: 1px solid #4a5568; /* border-gray-700 */
+        }
+        .admin-section-title {
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 600; /* font-semibold */
+            color: #facc15; /* text-yellow-400 (adjusted for better contrast if needed) */
+            margin-bottom: 1rem; /* mb-4 */
+            padding-bottom: 0.5rem; /* pb-2 */
+            border-bottom: 1px solid #4a5568; /* border-gray-700 */
         }
 
     </style>
@@ -133,46 +149,48 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            onAuthStateChanged, 
-            createUserWithEmailAndPassword, 
-            signInWithEmailAndPassword, 
+        import {
+            getAuth,
+            onAuthStateChanged,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
             signOut,
             signInWithCustomToken
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            getDocs, 
-            doc, 
-            getDoc, 
+        import {
+            getFirestore,
+            collection,
+            addDoc,
+            getDocs,
+            doc,
+            getDoc,
             setDoc,
-            query, 
-            where, 
+            query,
+            where,
             Timestamp,
             onSnapshot,
             deleteDoc,
             updateDoc,
             increment,
-            orderBy, 
+            orderBy,
             limit,
-            runTransaction 
+            runTransaction,
+            setLogLevel // Added for debug logging
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- Firebase Configuration ---
         const userHardcodedFirebaseConfig = {
           apiKey: "AIzaSyCFqjQc4lEj8-djp7frombN_isi_3DVnCM", 
           authDomain: "negativa-af3a2.firebaseapp.com",
           projectId: "negativa-af3a2",
-          storageBucket: "negativa-af3a2.appspot.com", 
+          storageBucket: "negativa-af3a2.appspot.com",
           messagingSenderId: "448951636288",
-          appId: "1:448951636288:web:60d1ebb08fcd5b246aaaa5", 
+          appId: "1:448951636288:web:60d1ebb08fcd5b246aaaa5",
           measurementId: "G-GPG4L7TZVE"
         };
 
-        let activeFirebaseConfig = userHardcodedFirebaseConfig; 
-        let finalInitialAuthToken = undefined; 
+        let activeFirebaseConfig = userHardcodedFirebaseConfig;
+        let finalInitialAuthToken = undefined;
 
         const canvasProvidedFirebaseConfigStr = (typeof __firebase_config !== 'undefined' && __firebase_config !== null && String(__firebase_config).trim() !== "" && String(__firebase_config) !== "{}")
             ? String(__firebase_config)
@@ -190,10 +208,10 @@
             } catch (e) {
                 console.error("Error parsing Canvas-provided Firebase config. Falling back to user's hardcoded config. Custom token from Canvas will NOT be used.", e);
                 activeFirebaseConfig = userHardcodedFirebaseConfig;
-                finalInitialAuthToken = undefined; 
+                finalInitialAuthToken = undefined;
             }
         } else if (canvasProvidedInitialAuthToken) {
-            console.warn("Canvas custom token detected, but no valid Canvas Firebase config. Using user's hardcoded Firebase config. Canvas token will NOT be used to prevent mismatch. User will need to log in via email/password.");
+            console.warn("Canvas custom token detected, but no valid Canvas Firebase config. Using user's hardcoded Firebase config. Canvas token will NOT be used to prevent mismatch.");
             activeFirebaseConfig = userHardcodedFirebaseConfig;
             finalInitialAuthToken = undefined;
         } else {
@@ -213,6 +231,8 @@
             app = initializeApp(activeFirebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
+            setLogLevel('debug'); 
+            console.log("Firebase initialized successfully. Firestore debug logging enabled.");
         } catch (e) {
             console.error("CRITICAL: Firebase initialization failed:", e);
             const errorModal = document.getElementById('message-modal');
@@ -222,22 +242,23 @@
                 errorModalText.className = 'mb-4 text-red-700';
                 errorModal.style.display = 'flex';
             } else {
-                alert("Falha crítica na inicialização do Firebase: " + e.message + ". O aplicativo pode não funcionar corretamente. Verifique o console para detalhes.");
+                console.error("Fallback Alert: Falha crítica na inicialização do Firebase: " + e.message);
             }
         }
 
         let currentUser = null;
         let currentUserId = null;
-        let isAdmin = false; 
+        let isAdmin = false;
         let userProfileData = null; 
         let currentRolePermissions = {}; 
 
         let unsubscribeCategories = null;
         let unsubscribeTopics = null;
         let unsubscribePosts = null;
-        let unsubscribeServerConfig = null; 
+        let unsubscribeServerConfig = null;
         let unsubscribeRecentMembers = null;
         let unsubscribeChatMessages = null;
+        let unsubscribeCurrentUserProfile = null; 
 
         const PERMISSIONS = {
             MANAGE_FORUM_SETTINGS: 'canManageForumSettings',
@@ -252,134 +273,56 @@
             DELETE_OWN_POST: 'canDeleteOwnPost',
             DELETE_ANY_POST: 'canDeleteAnyPost',
             MODERATE_CHAT: 'canModerateChat',
-            MANAGE_ROLES_PERMISSIONS: 'canManageRolesPermissions' 
+            MANAGE_ROLES_PERMISSIONS: 'canManageRolesPermissions'
         };
 
-        const defaultRoles = ['Admin', 'Moderador', 'VIP', 'Membro']; 
+        const defaultRoles = ['Admin', 'Moderador', 'VIP', 'Membro'];
         let currentRoleColors = {}; 
         let serverRolePermissionsConfig = {}; 
         let registrationsOpen = true; 
 
-        const views = {
-            loading: document.getElementById('loading-view'),
-            login: document.getElementById('login-view'),
-            register: document.getElementById('register-view'),
-            forumHome: document.getElementById('forum-home-view'),
-            category: document.getElementById('category-view'),
-            topic: document.getElementById('topic-view'),
-            myProfile: document.getElementById('my-profile-view'),
-            userProfile: document.getElementById('user-profile-view'),
-        };
-        const forumTitleHeader = document.getElementById('forum-title-header');
-        const forumTitleTag = document.getElementById('forum-title-tag');
-        const userDisplay = document.getElementById('user-display');
-        const loginNav = document.getElementById('login-nav');
-        const registerNav = document.getElementById('register-nav');
-        const logoutNav = document.getElementById('logout-nav');
-        const myProfileNav = document.getElementById('my-profile-nav');
-        const adminControls = document.getElementById('admin-controls');
-        const categoriesList = document.getElementById('categories-list');
-        const topicsList = document.getElementById('topics-list');
-        const postsList = document.getElementById('posts-list');
-        const categoryTitle = document.getElementById('category-title');
-        const topicTitleFull = document.getElementById('topic-title-full');
-        const breadcrumbs = document.getElementById('breadcrumbs');
-        const currentUserIdDisplay = document.getElementById('current-user-id-display');
-        
-        const adminUserList = document.getElementById('admin-user-list');
-        const generateCategoryDescBtn = document.getElementById('generate-category-description-btn');
-        const categoryNameInput = document.getElementById('category-name');
-        const categoryDescriptionInput = document.getElementById('category-description');
-        const suggestTopicTitleBtn = document.getElementById('suggest-topic-title-btn');
-        const newTopicContentInput = document.getElementById('new-topic-content');
-        const newTopicTitleInput = document.getElementById('new-topic-title');
-        const newTopicCommandInput = document.getElementById('new-topic-command');
-        // Poll related UI element consts removed
+        const views = {}; 
+        let forumTitleHeader, forumTitleTag, userDisplay, loginNav, registerNav, logoutNav, myProfileNav, adminControls,
+            categoriesList, topicsList, postsList, categoryTitle, topicTitleFull, breadcrumbs, currentUserIdDisplay,
+            adminUserList, generateCategoryDescBtn, categoryNameInput, categoryDescriptionInput, suggestTopicTitleBtn,
+            newTopicContentInput, newTopicTitleInput, newTopicCommandInput, myProfileNicknameInput, myProfileSteamUrlInput,
+            myProfileEmailDisplay, myProfileRoleDisplay, myProfileSaveBtn, userProfileViewDisplayName, userProfileViewNickname,
+            userProfileViewEmail, userProfileViewRole, userProfileViewSteamLink, userProfileViewRegisteredDate,
+            adminRoleColorSettings, saveRoleColorsBtn, adminForumNameInput, saveForumNameBtn, adminRegistrationsToggle,
+            saveRegistrationSettingsBtn, csServersListAdmin, addCsServerBtn, csServerModal, csServerForm, csServerIdInput,
+            csServerNameInput, csServerConnectInput, cancelCsServerBtn, serverInfoBannerContainer, recentMembersList,
+            editPostModal, editPostContentInput, saveEditPostBtn, cancelEditPostBtn, chatMessagesContainer,
+            chatMessageInput, sendChatMessageBtn, backToForumFromProfileBtn, adminPermissionsSettings, savePermissionsBtn;
 
-        const myProfileNicknameInput = document.getElementById('my-profile-nickname');
-        const myProfileSteamUrlInput = document.getElementById('my-profile-steam-url');
-        const myProfileEmailDisplay = document.getElementById('my-profile-email');
-        const myProfileRoleDisplay = document.getElementById('my-profile-role');
-        const myProfileSaveBtn = document.getElementById('my-profile-save-btn');
-
-        const userProfileViewDisplayName = document.getElementById('user-profile-view-displayName');
-        const userProfileViewNickname = document.getElementById('user-profile-view-nickname');
-        const userProfileViewEmail = document.getElementById('user-profile-view-email');
-        const userProfileViewRole = document.getElementById('user-profile-view-role');
-        const userProfileViewSteamLink = document.getElementById('user-profile-view-steam-link');
-        const userProfileViewRegisteredDate = document.getElementById('user-profile-view-registered-date');
-        
-        const adminRoleColorSettings = document.getElementById('admin-role-color-settings');
-        const saveRoleColorsBtn = document.getElementById('save-role-colors-btn');
-        
-        const adminForumNameInput = document.getElementById('admin-forum-name');
-        const saveForumNameBtn = document.getElementById('save-forum-name-btn');
-        const adminRegistrationsToggle = document.getElementById('admin-registrations-toggle');
-        const saveRegistrationSettingsBtn = document.getElementById('save-registration-settings-btn');
-
-
-        const csServersListAdmin = document.getElementById('cs-servers-list-admin');
-        const addCsServerBtn = document.getElementById('add-cs-server-btn');
-        const csServerModal = document.getElementById('cs-server-modal');
-        const csServerForm = document.getElementById('cs-server-form');
-        const csServerIdInput = document.getElementById('cs-server-id');
-        const csServerNameInput = document.getElementById('cs-server-name');
-        const csServerConnectInput = document.getElementById('cs-server-connect');
-        const cancelCsServerBtn = document.getElementById('cancel-cs-server');
-        const serverInfoBannerContainer = document.getElementById('server-info-banner-container');
-        
-        const recentMembersList = document.getElementById('recent-members-list');
-        const editPostModal = document.getElementById('edit-post-modal');
-        const editPostContentInput = document.getElementById('edit-post-content');
-        const saveEditPostBtn = document.getElementById('save-edit-post-btn');
-        const cancelEditPostBtn = document.getElementById('cancel-edit-post-btn');
-        let editingPostId = null;
-
-        const chatMessagesContainer = document.getElementById('chat-messages');
-        const chatMessageInput = document.getElementById('chat-message-input');
-        const sendChatMessageBtn = document.getElementById('send-chat-message-btn');
-        const backToForumFromProfileBtn = document.getElementById('back-to-forum-from-profile'); 
-
-        const adminPermissionsSettings = document.getElementById('admin-permissions-settings');
-        const savePermissionsBtn = document.getElementById('save-permissions-btn');
-
-
-        // --- Utility Functions ---
         function formatTimestamp(firebaseTimestamp) {
-            if (!firebaseTimestamp || !firebaseTimestamp.seconds) {
+            if (!firebaseTimestamp || typeof firebaseTimestamp.seconds !== 'number') {
                 return 'Data inválida';
             }
             const date = new Date(firebaseTimestamp.seconds * 1000);
             const now = new Date();
-            const diffInSeconds = Math.floor((now - date) / 1000);
+            const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
+            if (diffInSeconds < 0) return `em breve`; 
             if (diffInSeconds < 60) return `há ${diffInSeconds} seg`;
             const diffInMinutes = Math.floor(diffInSeconds / 60);
             if (diffInMinutes < 60) return `há ${diffInMinutes} min`;
             const diffInHours = Math.floor(diffInMinutes / 60);
             if (diffInHours < 24) return `há ${diffInHours} h`;
-            
+
             const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
             return date.toLocaleDateString('pt-BR', options);
         }
 
         function hasPermission(permissionKey) {
-            console.log(`[Client] Checking permission: ${permissionKey}`);
             if (!userProfileData || !userProfileData.role) {
-                console.log("[Client] Permission denied: No userProfileData or role.");
                 return false;
             }
-            if (userProfileData.role === 'Admin') {
-                console.log("[Client] Permission GRANTED: User is Admin.");
-                return true; 
+            if (userProfileData.role === 'Admin') { 
+                return true;
             }
-            
             const rolePerms = serverRolePermissionsConfig[userProfileData.role];
-            const hasPerm = rolePerms && rolePerms[permissionKey] === true;
-            console.log(`[Client] Permission for ${permissionKey} for role ${userProfileData.role}: ${hasPerm}. RolePerms:`, rolePerms);
-            return hasPerm;
+            return rolePerms && rolePerms[permissionKey] === true;
         }
-
 
         function showView(viewName, params = null) {
             Object.values(views).forEach(view => view.classList.remove('active-view'));
@@ -391,29 +334,113 @@
                     loadMyProfileView();
                 }
             } else {
-                console.error(`View ${viewName} not found.`);
-                if (views.login) views.login.classList.add('active-view'); 
+                console.error(`View ${viewName} not found. Defaulting to login or forum home.`);
+                if (currentUser && views.forumHome) views.forumHome.classList.add('active-view');
+                else if (views.login) views.login.classList.add('active-view');
             }
             window.scrollTo(0, 0);
         }
+        
+        function populateDomElementVariables() {
+            views.loading = document.getElementById('loading-view');
+            views.login = document.getElementById('login-view');
+            views.register = document.getElementById('register-view');
+            views.forumHome = document.getElementById('forum-home-view');
+            views.category = document.getElementById('category-view');
+            views.topic = document.getElementById('topic-view');
+            views.myProfile = document.getElementById('my-profile-view');
+            views.userProfile = document.getElementById('user-profile-view');
+
+            forumTitleHeader = document.getElementById('forum-title-header');
+            forumTitleTag = document.getElementById('forum-title-tag');
+            userDisplay = document.getElementById('user-display');
+            loginNav = document.getElementById('login-nav');
+            registerNav = document.getElementById('register-nav');
+            logoutNav = document.getElementById('logout-nav');
+            myProfileNav = document.getElementById('my-profile-nav');
+            adminControls = document.getElementById('admin-controls');
+            categoriesList = document.getElementById('categories-list');
+            topicsList = document.getElementById('topics-list');
+            postsList = document.getElementById('posts-list');
+            categoryTitle = document.getElementById('category-title');
+            topicTitleFull = document.getElementById('topic-title-full');
+            breadcrumbs = document.getElementById('breadcrumbs');
+            currentUserIdDisplay = document.getElementById('current-user-id-display');
+            
+            adminUserList = document.getElementById('admin-user-list');
+            generateCategoryDescBtn = document.getElementById('generate-category-description-btn');
+            categoryNameInput = document.getElementById('category-name');
+            categoryDescriptionInput = document.getElementById('category-description');
+            suggestTopicTitleBtn = document.getElementById('suggest-topic-title-btn');
+            newTopicContentInput = document.getElementById('new-topic-content');
+            newTopicTitleInput = document.getElementById('new-topic-title');
+            newTopicCommandInput = document.getElementById('new-topic-command');
+
+            myProfileNicknameInput = document.getElementById('my-profile-nickname');
+            myProfileSteamUrlInput = document.getElementById('my-profile-steam-url');
+            myProfileEmailDisplay = document.getElementById('my-profile-email');
+            myProfileRoleDisplay = document.getElementById('my-profile-role');
+            myProfileSaveBtn = document.getElementById('my-profile-save-btn');
+
+            userProfileViewDisplayName = document.getElementById('user-profile-view-displayName');
+            userProfileViewNickname = document.getElementById('user-profile-view-nickname');
+            userProfileViewEmail = document.getElementById('user-profile-view-email');
+            userProfileViewRole = document.getElementById('user-profile-view-role');
+            userProfileViewSteamLink = document.getElementById('user-profile-view-steam-link');
+            userProfileViewRegisteredDate = document.getElementById('user-profile-view-registered-date');
+            
+            adminRoleColorSettings = document.getElementById('admin-role-color-settings');
+            saveRoleColorsBtn = document.getElementById('save-role-colors-btn');
+            
+            adminForumNameInput = document.getElementById('admin-forum-name');
+            saveForumNameBtn = document.getElementById('save-forum-name-btn');
+            adminRegistrationsToggle = document.getElementById('admin-registrations-toggle');
+            saveRegistrationSettingsBtn = document.getElementById('save-registration-settings-btn');
+
+            csServersListAdmin = document.getElementById('cs-servers-list-admin');
+            addCsServerBtn = document.getElementById('add-cs-server-btn');
+            csServerModal = document.getElementById('cs-server-modal');
+            csServerForm = document.getElementById('cs-server-form');
+            csServerIdInput = document.getElementById('cs-server-id');
+            csServerNameInput = document.getElementById('cs-server-name');
+            csServerConnectInput = document.getElementById('cs-server-connect');
+            cancelCsServerBtn = document.getElementById('cancel-cs-server');
+            serverInfoBannerContainer = document.getElementById('server-info-banner-container');
+            
+            recentMembersList = document.getElementById('recent-members-list');
+            editPostModal = document.getElementById('edit-post-modal');
+            editPostContentInput = document.getElementById('edit-post-content');
+            saveEditPostBtn = document.getElementById('save-edit-post-btn');
+            cancelEditPostBtn = document.getElementById('cancel-edit-post-btn');
+
+            chatMessagesContainer = document.getElementById('chat-messages');
+            chatMessageInput = document.getElementById('chat-message-input');
+            sendChatMessageBtn = document.getElementById('send-chat-message-btn');
+            backToForumFromProfileBtn = document.getElementById('back-to-forum-from-profile'); 
+
+            adminPermissionsSettings = document.getElementById('admin-permissions-settings');
+            savePermissionsBtn = document.getElementById('save-permissions-btn');
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
+            populateDomElementVariables(); 
+
             const showRegisterViewLink = document.getElementById('show-register-view');
             const showLoginViewLink = document.getElementById('show-login-view');
-            
+
             if(showRegisterViewLink) {
-                showRegisterViewLink.addEventListener('click', (e) => { 
-                    e.preventDefault(); 
+                showRegisterViewLink.addEventListener('click', (e) => {
+                    e.preventDefault();
                     if (registrationsOpen) {
-                        showView('register'); 
+                        showView('register');
                     } else {
                         showModal("Novos cadastros estão temporariamente desabilitados.", "info");
                     }
                 });
             }
             if(showLoginViewLink) {
-                showLoginViewLink.addEventListener('click', (e) => { 
-                    e.preventDefault(); 
+                showLoginViewLink.addEventListener('click', (e) => {
+                    e.preventDefault();
                     showView('login');
                 });
             }
@@ -423,37 +450,17 @@
                     showView('myProfile');
                 });
             }
-            if (myProfileSaveBtn) {
-                myProfileSaveBtn.addEventListener('click', saveMyProfile);
-            }
-            if (saveRoleColorsBtn) {
-                saveRoleColorsBtn.addEventListener('click', saveRoleColors);
-            }
-            if (saveForumNameBtn) {
-                saveForumNameBtn.addEventListener('click', saveForumName);
-            }
-            if (saveRegistrationSettingsBtn) {
-                saveRegistrationSettingsBtn.addEventListener('click', saveRegistrationSettings);
-            }
-            if (addCsServerBtn) {
-                addCsServerBtn.addEventListener('click', () => openCsServerModal());
-            }
-            if (csServerForm) {
-                csServerForm.addEventListener('submit', saveCsServer);
-            }
-            if (cancelCsServerBtn) {
-                cancelCsServerBtn.addEventListener('click', () => csServerModal.style.display = 'none');
-            }
-            if (saveEditPostBtn) {
-                saveEditPostBtn.addEventListener('click', saveEditedPost);
-            }
-            if (cancelEditPostBtn) {
-                cancelEditPostBtn.addEventListener('click', () => editPostModal.style.display = 'none');
-            }
-            if (sendChatMessageBtn) {
-                sendChatMessageBtn.addEventListener('click', sendChatMessage);
-            }
-            if (chatMessageInput) { 
+            if (myProfileSaveBtn) myProfileSaveBtn.addEventListener('click', saveMyProfile);
+            if (saveRoleColorsBtn) saveRoleColorsBtn.addEventListener('click', saveRoleColors);
+            if (saveForumNameBtn) saveForumNameBtn.addEventListener('click', saveForumName);
+            if (saveRegistrationSettingsBtn) saveRegistrationSettingsBtn.addEventListener('click', saveRegistrationSettings);
+            if (addCsServerBtn) addCsServerBtn.addEventListener('click', () => openCsServerModal());
+            if (csServerForm) csServerForm.addEventListener('submit', saveCsServer);
+            if (cancelCsServerBtn) cancelCsServerBtn.addEventListener('click', () => csServerModal.style.display = 'none');
+            if (saveEditPostBtn) saveEditPostBtn.addEventListener('click', saveEditedPost);
+            if (cancelEditPostBtn) cancelEditPostBtn.addEventListener('click', () => editPostModal.style.display = 'none');
+            if (sendChatMessageBtn) sendChatMessageBtn.addEventListener('click', sendChatMessage);
+            if (chatMessageInput) {
                 chatMessageInput.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -461,22 +468,68 @@
                     }
                 });
             }
-            if (backToForumFromProfileBtn) { 
-                backToForumFromProfileBtn.addEventListener('click', () => showView('forumHome'));
-            }
-            if (savePermissionsBtn) {
-                savePermissionsBtn.addEventListener('click', saveRolePermissions);
+            if (backToForumFromProfileBtn) backToForumFromProfileBtn.addEventListener('click', () => showView('forumHome'));
+            if (savePermissionsBtn) savePermissionsBtn.addEventListener('click', saveRolePermissions);
+            
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) loginForm.addEventListener('submit', handleLogin);
+            
+            const registerForm = document.getElementById('register-form');
+            if (registerForm) registerForm.addEventListener('submit', handleRegister);
+
+            if (logoutNav) logoutNav.addEventListener('click', handleLogout);
+            if (loginNav) loginNav.addEventListener('click', (e) => { e.preventDefault(); showView('login'); });
+            if (registerNav) registerNav.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (registrationsOpen) {
+                    showView('register');
+                } else {
+                    showModal("Novos cadastros estão temporariamente desabilitados.", "info");
+                }
+            });
+
+            const createCategoryForm = document.getElementById('create-category-form');
+            if (createCategoryForm) createCategoryForm.addEventListener('submit', handleCreateCategory);
+
+            const createTopicFormModal = document.getElementById('create-topic-form-modal');
+            if (createTopicFormModal) createTopicFormModal.addEventListener('submit', handleCreateTopic);
+            
+            const showCreateTopicModalBtn = document.getElementById('show-create-topic-modal');
+            if(showCreateTopicModalBtn) showCreateTopicModalBtn.addEventListener('click', openCreateTopicModal);
+
+            const cancelCreateTopicBtn = document.getElementById('cancel-create-topic');
+            if(cancelCreateTopicBtn) cancelCreateTopicBtn.addEventListener('click', () => {
+                document.getElementById('create-topic-modal').style.display = 'none';
+            });
+
+            const createPostForm = document.getElementById('create-post-form');
+            if (createPostForm) createPostForm.addEventListener('submit', handleCreatePost);
+            
+            if (breadcrumbs) breadcrumbs.addEventListener('click', handleBreadcrumbNavigation);
+            if (categoriesList) categoriesList.addEventListener('click', handleCategoryListClick);
+            if (topicsList) topicsList.addEventListener('click', handleTopicListClick);
+            if (postsList) postsList.addEventListener('click', handlePostListClick);
+
+            if (generateCategoryDescBtn) generateCategoryDescBtn.addEventListener('click', generateCategoryDescription);
+            if (suggestTopicTitleBtn) suggestTopicTitleBtn.addEventListener('click', suggestTopicTitle);
+
+            if (auth) {
+                initAuth(); 
+            } else {
+                console.warn("Firebase Auth not available at DOMContentLoaded. Login might be impaired.");
+                showView('login'); 
             }
         });
 
-        function updateBreadcrumbs(path) { 
+        function updateBreadcrumbs(path) {
+            if (!breadcrumbs) return;
             breadcrumbs.innerHTML = `<a href="#" data-view="forumHome" class="hover:text-blue-400">Início</a>`;
             path.forEach(p => {
                 breadcrumbs.innerHTML += ` <span class="text-gray-500">/</span> <a href="#" data-view="${p.view}" data-id="${p.id || ''}" class="hover:text-blue-400">${p.name}</a>`;
             });
         }
 
-        breadcrumbs.addEventListener('click', (e) => {
+        function handleBreadcrumbNavigation(e) {
             if (e.target.tagName === 'A' && e.target.dataset.view) {
                 e.preventDefault();
                 const view = e.target.dataset.view;
@@ -484,8 +537,8 @@
                 if (view === 'forumHome') loadCategories();
                 else if (view === 'category' && id) loadTopics(id, e.target.textContent);
             }
-        });
-        
+        }
+
         function clearFirestoreListeners() {
             if (unsubscribeCategories) unsubscribeCategories();
             if (unsubscribeTopics) unsubscribeTopics();
@@ -493,119 +546,169 @@
             if (unsubscribeServerConfig) unsubscribeServerConfig();
             if (unsubscribeRecentMembers) unsubscribeRecentMembers();
             if (unsubscribeChatMessages) unsubscribeChatMessages();
+            if (unsubscribeCurrentUserProfile) unsubscribeCurrentUserProfile(); 
             unsubscribeCategories = null;
             unsubscribeTopics = null;
             unsubscribePosts = null;
             unsubscribeServerConfig = null;
             unsubscribeRecentMembers = null;
             unsubscribeChatMessages = null;
-            console.log("Firestore listeners cleared.");
+            unsubscribeCurrentUserProfile = null;
+            console.log("All Firestore listeners cleared.");
         }
-
 
         if (auth) {
             onAuthStateChanged(auth, async (user) => {
-                clearFirestoreListeners(); 
+                clearFirestoreListeners();
                 showView('loading');
                 if (user) {
                     currentUser = user;
                     currentUserId = user.uid;
-                    
                     const userProfileRef = doc(db, `artifacts/${firestorePathAppId}/public/data/userProfiles`, currentUserId);
-                    try {
-                        await updateDoc(userProfileRef, { lastSeen: Timestamp.now() }); 
-                    } catch (e) { /* If profile doesn't exist yet, it will be created below */ }
 
-                    let userProfileSnap = await getDoc(userProfileRef);
-                    
-                    if (!userProfileSnap.exists()) {
-                        try {
-                            userProfileData = {
-                                email: user.email,
-                                displayName: user.email ? user.email.split('@')[0] : 'Usuário ' + user.uid.substring(0,5),
-                                nickname: "",
-                                steamProfileUrl: "",
-                                createdAt: Timestamp.now(),
-                                lastSeen: Timestamp.now(),
-                                role: 'Membro' 
-                            };
-                            await setDoc(userProfileRef, userProfileData);
-                            console.log("[Auth] New user profile created:", JSON.stringify(userProfileData));
-                        } catch (error) {
-                            console.error("[Auth] Error creating user profile:", error);
-                            showModal("Erro ao criar perfil de usuário: " + error.message);
-                            userProfileData = { role: 'Membro', lastSeen: Timestamp.now() }; 
+                    unsubscribeCurrentUserProfile = onSnapshot(userProfileRef, async (profileSnap) => {
+                        if (!currentUser) return; 
+
+                        let initialProfileLoad = !userProfileData; // Check if this is the first time profile data is loaded for this session
+
+                        if (profileSnap.exists()) {
+                            const updatedProfileData = profileSnap.data();
+                            const oldRole = userProfileData ? userProfileData.role : null;
+                            userProfileData = updatedProfileData;
+                            isAdmin = (userProfileData.role === 'Admin');
+                            
+                            console.log("[Profile Listener] Profile data updated:", userProfileData);
+
+                            // Update currentRolePermissions based on the potentially new role and live server config
+                            if (userProfileData.role && serverRolePermissionsConfig[userProfileData.role]) {
+                                currentRolePermissions = serverRolePermissionsConfig[userProfileData.role];
+                            } else { // Fallback if role is not in config or no role
+                                currentRolePermissions = {};
+                                if (userProfileData.role) console.warn(`Role "${userProfileData.role}" not found in serverRolePermissionsConfig.`);
+                            }
+                            console.log("[Profile Listener] Current role permissions set:", currentRolePermissions);
+
+
+                            userDisplay.textContent = `Bem-vindo, ${userProfileData.nickname || userProfileData.displayName || currentUser.email.split('@')[0]}`;
+                            currentUserIdDisplay.style.display = isAdmin ? 'inline-block' : 'none';
+                            currentUserIdDisplay.textContent = isAdmin ? `User ID: ${currentUserId}` : '';
+                            
+                            if (views.myProfile && views.myProfile.classList.contains('active-view')) {
+                                loadMyProfileView(); 
+                            }
+                             // If it's the initial load of the profile OR role changed, refresh dependent UI
+                            if (initialProfileLoad || (oldRole && oldRole !== userProfileData.role)) {
+                                console.log(`[Profile Listener] Initial profile load (${initialProfileLoad}) or role change (from ${oldRole} to ${userProfileData.role}). Refreshing UI components.`);
+                                if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
+                                    adminControls.style.display = 'block';
+                                    loadUsersForAdmin(); 
+                                    loadAdminServerSettings(); 
+                                    loadRoleColorSettings();
+                                    loadRolePermissionsSettings();
+                                } else {
+                                    adminControls.style.display = 'none';
+                                }
+                            }
+
+
+                        } else {
+                            console.log("[Profile Listener] User profile does not exist. Attempting to create.");
+                            try {
+                                userProfileData = {
+                                    email: currentUser.email,
+                                    displayName: currentUser.email ? currentUser.email.split('@')[0] : 'Usuário ' + currentUser.uid.substring(0,5),
+                                    nickname: "",
+                                    steamProfileUrl: "",
+                                    createdAt: Timestamp.now(),
+                                    lastSeen: Timestamp.now(),
+                                    role: 'Membro' 
+                                };
+                                await setDoc(userProfileRef, userProfileData);
+                                console.log("[Auth/Profile Listener] New user profile created:", JSON.stringify(userProfileData));
+                                isAdmin = (userProfileData.role === 'Admin'); // Set isAdmin after creation
+                                // The listener will fire again with the new data, triggering UI updates.
+                                initialProfileLoad = true; // Treat as initial load for subsequent logic
+                            } catch (error) {
+                                console.error("[Auth/Profile Listener] Error creating user profile:", error);
+                                showModal("Erro ao criar perfil de usuário: " + error.message);
+                                userProfileData = { role: 'Membro', lastSeen: Timestamp.now() }; 
+                                isAdmin = false;
+                            }
                         }
-                    } else {
-                        userProfileData = userProfileSnap.data();
-                        console.log("[Auth] User profile loaded:", JSON.stringify(userProfileData));
-                    }
+
+                        if (initialProfileLoad && userProfileData) { // Only proceed with full load sequence on initial profile availability
+                            loginNav.style.display = 'none';
+                            logoutNav.style.display = 'inline-block';
+                            myProfileNav.style.display = 'inline-block';
+                            
+                            try {
+                                await loadServerConfig(); // Wait for initial server config
+                                console.log("[Auth State] Server config loaded. Proceeding with other data loads.");
+                                // UI updates dependent on server config are now safe
+                                if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
+                                    adminControls.style.display = 'block';
+                                    // These were potentially called above, but ensure they run with fresh serverConfig
+                                    loadUsersForAdmin();
+                                    loadAdminServerSettings(); 
+                                    loadRoleColorSettings();
+                                    loadRolePermissionsSettings();
+                                } else {
+                                    adminControls.style.display = 'none';
+                                }
+                                registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
+                                loadCategories();
+                                loadRecentMembers();
+                                loadChatMessages();
+                                showView('forumHome'); // Show forum home after everything is ready
+                            } catch (error) {
+                                console.error("Failed to load initial server config:", error);
+                                showModal("Erro crítico ao carregar configurações do servidor.", "error");
+                                registerNav.style.display = 'inline-block'; 
+                                showView('forumHome'); // Show forum home even if server config fails, with defaults
+                            }
+                        }
+                    }, (error) => {
+                        console.error("[Profile Listener] Error listening to user profile:", error);
+                        showModal("Erro ao carregar dados do perfil. Tente recarregar.", "error");
+                        if (auth) signOut(auth);
+                    });
                     
-                    isAdmin = (userProfileData.role === 'Admin'); 
-                    console.log("[Auth] User role from profile:", userProfileData.role);
-                    console.log("[Auth] isAdmin determined as:", isAdmin);
+                    try {
+                        await updateDoc(userProfileRef, { lastSeen: Timestamp.now() });
+                    } catch (e) { console.warn("Could not update lastSeen initially:", e.message); }
 
-                    userDisplay.textContent = `Bem-vindo, ${userProfileData.nickname || userProfileData.displayName || user.email}`;
-                    currentUserIdDisplay.style.display = isAdmin ? 'inline-block' : 'none'; 
-                    currentUserIdDisplay.textContent = isAdmin ? `User ID: ${currentUserId}` : '';
-
-                    loginNav.style.display = 'none';
-                    logoutNav.style.display = 'inline-block';
-                    myProfileNav.style.display = 'inline-block';
-
-                    await loadServerConfig(); 
-                    console.log("[Auth] Server role permissions config after load:", JSON.stringify(serverRolePermissionsConfig));
-                    console.log("[Auth] Current user role for permission check (after server config):", userProfileData.role);
-                    console.log("[Auth] Current user's specific permissions:", JSON.stringify(currentRolePermissions));
-
-
-                    if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) { 
-                        adminControls.style.display = 'block';
-                        loadUsersForAdmin(); 
-                        loadAdminServerSettings(); 
-                        loadRoleColorSettings();
-                        loadRolePermissionsSettings(); 
-                    } else {
-                        adminControls.style.display = 'none';
+                } else { 
+                    if (unsubscribeCurrentUserProfile) { 
+                        unsubscribeCurrentUserProfile();
+                        unsubscribeCurrentUserProfile = null;
                     }
-                    
-                    // Update registerNav visibility based on registrationsOpen (which is set in loadServerConfig)
-                    registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
-
-                    loadCategories();
-                    loadRecentMembers();
-                    loadChatMessages(); 
-                } else {
                     currentUser = null;
                     currentUserId = null; 
                     userProfileData = null;
                     isAdmin = false;
                     currentRolePermissions = {};
 
-
                     userDisplay.textContent = 'Você não está logado.';
                     currentUserIdDisplay.style.display = 'none';
                     loginNav.style.display = 'inline-block';
-                    
-                    // Attempt to load server config even for logged-out users to get registration status
-                    await loadServerConfig(); 
-                    registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
-
                     logoutNav.style.display = 'none';
                     myProfileNav.style.display = 'none';
                     adminControls.style.display = 'none';
-                    serverInfoBannerContainer.innerHTML = ''; 
-                    recentMembersList.innerHTML = ''; 
+                    
+                    await loadServerConfig(); // Still load for registration status
+                    registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
+
+                    if(serverInfoBannerContainer) serverInfoBannerContainer.innerHTML = ''; 
+                    if(recentMembersList) recentMembersList.innerHTML = ''; 
                     if(chatMessagesContainer) chatMessagesContainer.innerHTML = ''; 
                     showView('login');
                 }
             });
         } else {
-            console.error("Auth service is not available. Cannot set up onAuthStateChanged listener.");
-            showModal("Serviço de autenticação indisponível. O aplicativo não pode continuar.");
+            console.error("Auth service is not available.");
+            showModal("Serviço de autenticação indisponível.");
             showView('login');
         }
-
 
         async function initAuth() {
             if (!auth) {
@@ -620,20 +723,19 @@
                     await signInWithCustomToken(auth, finalInitialAuthToken);
                     console.log("Successfully signed in with custom token.");
                 } else {
-                    const user = auth.currentUser; 
-                     if (!user) {
-                        console.log("No custom token and no existing user session. Waiting for onAuthStateChanged or user login.");
-                     } else {
-                        console.log("Existing user session found:", user.uid);
+                     console.log("No custom token. Waiting for onAuthStateChanged or user login.");
+                     if (!auth.currentUser) { 
+                        showView('login'); 
                      }
                 }
             } catch (error) {
-                console.error("Authentication initialization error with custom token:", error); 
-                showModal("Erro na autenticação com token: " + error.message + ". Por favor, faça login manualmente.", "error");
+                console.error("Authentication initialization error:", error); 
+                showModal("Erro na autenticação automática: " + error.message + ". Por favor, faça login manualmente.", "error");
+                showView('login');
             }
         }
 
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
+        async function handleLogin(e) {
             e.preventDefault();
             if (!auth) { showModal("Serviço de autenticação indisponível."); return; }
             const email = e.target.email.value;
@@ -644,9 +746,9 @@
                 console.error("Error signing in:", error);
                 showModal("Erro ao fazer login: " + error.message);
             }
-        });
+        }
 
-        document.getElementById('register-form').addEventListener('submit', async (e) => {
+        async function handleRegister(e) {
             e.preventDefault();
             if (!registrationsOpen) {
                 showModal("Novos cadastros estão temporariamente desabilitados.", "error");
@@ -670,12 +772,12 @@
                 console.error("Error registering:", error);
                 showModal("Erro ao registrar: " + error.message);
             }
-        });
+        }
 
-        logoutNav.addEventListener('click', async () => {
+        async function handleLogout() {
             if (!auth) { showModal("Serviço de autenticação indisponível."); return; }
             try {
-                if(currentUser && db) { 
+                if(currentUser && db && currentUserId) { 
                     const userProfileRef = doc(db, `artifacts/${firestorePathAppId}/public/data/userProfiles`, currentUserId);
                     await updateDoc(userProfileRef, { lastSeen: Timestamp.now() });
                 }
@@ -684,18 +786,8 @@
                 console.error("Error signing out:", error);
                 showModal("Erro ao fazer logout: " + error.message);
             }
-        });
+        }
         
-        loginNav.addEventListener('click', (e) => { e.preventDefault(); showView('login'); });
-        registerNav.addEventListener('click', (e) => { 
-            e.preventDefault(); 
-            if (registrationsOpen) {
-                showView('register');
-            } else {
-                showModal("Novos cadastros estão temporariamente desabilitados.", "info");
-            }
-        });
-
         let categoriesCol, topicsCol, postsCol, userProfilesCol, serverConfigDocRef, chatMessagesCol;
         if (db) {
             categoriesCol = collection(db, `artifacts/${firestorePathAppId}/public/data/categories`);
@@ -725,15 +817,15 @@
         }
 
         async function loadAdminServerSettings() { 
-            if (!db || !serverConfigDocRef) return;
+            if (!db || !serverConfigDocRef || !adminForumNameInput || !adminRegistrationsToggle) return;
             try {
-                const docSnap = await getDoc(serverConfigDocRef);
+                const docSnap = await getDoc(serverConfigDocRef); 
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     adminForumNameInput.value = data.forumName || 'Negativa Server - Fórum';
                     adminRegistrationsToggle.checked = data.registrationsOpen === undefined ? true : data.registrationsOpen;
                     renderAdminCsServersList(data.csServers || []);
-                } else {
+                } else { 
                     adminForumNameInput.value = 'Negativa Server - Fórum'; 
                     adminRegistrationsToggle.checked = true; 
                     renderAdminCsServersList([]);
@@ -754,8 +846,6 @@
             try {
                 await setDoc(serverConfigDocRef, { forumName: newName }, { merge: true });
                 showModal("Nome do fórum salvo com sucesso!", "success");
-                forumTitleHeader.textContent = newName; 
-                forumTitleTag.textContent = newName;
             } catch (error) {
                 console.error("Error saving forum name:", error);
                 showModal("Erro ao salvar nome do fórum: " + error.message, "error");
@@ -769,8 +859,6 @@
             const newRegistrationsOpen = adminRegistrationsToggle.checked;
             try {
                 await setDoc(serverConfigDocRef, { registrationsOpen: newRegistrationsOpen }, { merge: true });
-                registrationsOpen = newRegistrationsOpen; 
-                registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
                 showModal(`Cadastros ${newRegistrationsOpen ? 'abertos' : 'fechados'} com sucesso!`, "success");
             } catch (error) {
                 console.error("Error saving registration settings:", error);
@@ -780,6 +868,7 @@
 
         
         function renderAdminCsServersList(servers = []) {
+            if (!csServersListAdmin) return;
             csServersListAdmin.innerHTML = '';
             if (servers.length === 0) {
                 csServersListAdmin.innerHTML = '<p class="text-sm text-gray-400">Nenhum servidor CS2 configurado.</p>';
@@ -810,10 +899,11 @@
         }
 
         async function openCsServerModal(index = null) {
+            if (!csServerForm || !csServerModal || !csServerIdInput || !csServerNameInput || !csServerConnectInput) return;
             csServerForm.reset();
             csServerIdInput.value = index !== null ? index : ''; 
             if (index !== null) {
-                const docSnap = await getDoc(serverConfigDocRef);
+                const docSnap = await getDoc(serverConfigDocRef); 
                 if (docSnap.exists() && docSnap.data().csServers && docSnap.data().csServers[index]) {
                     const server = docSnap.data().csServers[index];
                     csServerNameInput.value = server.displayName || '';
@@ -840,11 +930,11 @@
                 const docSnap = await getDoc(serverConfigDocRef);
                 let currentServers = [];
                 if (docSnap.exists() && docSnap.data().csServers) {
-                    currentServers = docSnap.data().csServers;
+                    currentServers = [...docSnap.data().csServers]; 
                 }
 
                 const newServer = { displayName, connectCommand };
-                if (serverId !== '') { 
+                if (serverId !== '' && currentServers[parseInt(serverId)]) { 
                     currentServers[parseInt(serverId)] = newServer;
                 } else { 
                     currentServers.push(newServer);
@@ -852,9 +942,7 @@
                 
                 await setDoc(serverConfigDocRef, { csServers: currentServers }, { merge: true });
                 showModal(`Servidor CS2 ${serverId !== '' ? 'atualizado' : 'adicionado'} com sucesso!`, "success");
-                renderAdminCsServersList(currentServers);
-                loadPublicCsServerBanners(); 
-                csServerModal.style.display = 'none';
+                if(csServerModal) csServerModal.style.display = 'none';
             } catch (error) {
                 console.error("Error saving CS server:", error);
                 showModal("Erro ao salvar servidor CS2: " + error.message, "error");
@@ -869,12 +957,10 @@
                 try {
                     const docSnap = await getDoc(serverConfigDocRef);
                     if (docSnap.exists() && docSnap.data().csServers) {
-                        let currentServers = docSnap.data().csServers;
+                        let currentServers = [...docSnap.data().csServers];
                         currentServers.splice(index, 1); 
                         await setDoc(serverConfigDocRef, { csServers: currentServers }, { merge: true });
                         showModal("Servidor CS2 excluído com sucesso!", "success");
-                        renderAdminCsServersList(currentServers);
-                        loadPublicCsServerBanners();
                     }
                 } catch (error) {
                     console.error("Error deleting CS server:", error);
@@ -883,42 +969,36 @@
             });
         }
 
-        async function loadPublicCsServerBanners() {
+        function loadPublicCsServerBanners(serversFromConfig) { 
+            if (!serverInfoBannerContainer) return;
             serverInfoBannerContainer.innerHTML = ''; 
-            if (!db || !serverConfigDocRef) return;
-            try {
-                const docSnap = await getDoc(serverConfigDocRef);
-                if (docSnap.exists() && docSnap.data().csServers && docSnap.data().csServers.length > 0) {
-                    const servers = docSnap.data().csServers;
-                    servers.forEach(server => {
-                        if (server.displayName && server.connectCommand) {
-                            const banner = document.createElement('div');
-                            banner.className = 'container mx-auto mt-2 bg-gray-700 p-3 text-center rounded-md shadow';
-                            banner.innerHTML = `
-                                <p class="text-base sm:text-lg text-gray-100">
-                                    ${server.displayName}: 
-                                    <a href="steam://connect/${server.connectCommand.replace('connect ', '')}" target="_blank" class="text-yellow-400 hover:text-yellow-300 font-semibold underline">${server.connectCommand.replace('connect ', '')}</a>
-                                    <button class="copy-cs-command-btn ml-3 bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded-md transition duration-150" data-command="${server.connectCommand}">Copiar Comando</button>
-                                </p>
-                            `;
-                            serverInfoBannerContainer.appendChild(banner);
-                        }
-                    });
-                    serverInfoBannerContainer.querySelectorAll('.copy-cs-command-btn').forEach(btn => {
-                        btn.addEventListener('click', (e) => copyToClipboard(e.target.dataset.command));
-                    });
-                }
-            } catch (error) {
-                console.error("Error loading CS server banners:", error);
+            if (serversFromConfig && serversFromConfig.length > 0) {
+                serversFromConfig.forEach(server => {
+                    if (server.displayName && server.connectCommand) {
+                        const banner = document.createElement('div');
+                        banner.className = 'container mx-auto mt-2 bg-gray-700 p-3 text-center rounded-md shadow';
+                        banner.innerHTML = `
+                            <p class="text-base sm:text-lg text-gray-100">
+                                ${server.displayName}: 
+                                <a href="steam://connect/${server.connectCommand.replace('connect ', '')}" target="_blank" class="text-yellow-400 hover:text-yellow-300 font-semibold underline">${server.connectCommand.replace('connect ', '')}</a>
+                                <button class="copy-cs-command-btn ml-3 bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded-md transition duration-150" data-command="${server.connectCommand}">Copiar Comando</button>
+                            </p>
+                        `;
+                        serverInfoBannerContainer.appendChild(banner);
+                    }
+                });
+                serverInfoBannerContainer.querySelectorAll('.copy-cs-command-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => copyToClipboard(e.target.dataset.command));
+                });
             }
         }
 
 
         async function loadUsersForAdmin() {
-            if (!db || !userProfilesCol || !hasPermission(PERMISSIONS.MANAGE_USERS)) return;
+            if (!db || !userProfilesCol || !hasPermission(PERMISSIONS.MANAGE_USERS) || !adminUserList) return;
             adminUserList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando usuários...</p>';
             try {
-                const snapshot = await getDocs(userProfilesCol);
+                const snapshot = await getDocs(query(userProfilesCol)); 
                 if (snapshot.empty) {
                     adminUserList.innerHTML = '<p class="text-gray-400 p-4 text-center">Nenhum usuário registrado encontrado.</p>';
                     return;
@@ -929,22 +1009,22 @@
                 userDocs.forEach(userDoc => {
                     const userId = userDoc.id;
                     const profile = userDoc.data();
-                    const canChangeRole = !(profile.role === 'Admin' && currentUserId === userId); 
+                    const isCurrentUserAdminEditingSelf = profile.role === 'Admin' && currentUserId === userId;
 
                     usersHtml += `
                         <div class="bg-gray-700 p-3 rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center">
                             <div class="mb-2 sm:mb-0">
                                 <p class="text-sm font-medium">${profile.nickname || profile.displayName || profile.email || 'N/A'}</p>
                                 <p class="text-xs text-gray-400">Email: ${profile.email || 'N/A'} | Cargo: <span id="role-display-${userId}">${profile.role || 'Membro'}</span></p>
-                                <p class="text-xs text-gray-500">Registrado em: ${formatTimestamp(profile.createdAt)}</p>
+                                <p class="text-xs text-gray-500">Registrado em: ${formatTimestamp(profile.createdAt)} | Visto por último: ${formatTimestamp(profile.lastSeen)}</p>
                                 <input type="text" id="nickname-edit-${userId}" value="${profile.nickname || ''}" placeholder="Nickname" class="mt-1 p-1 text-xs bg-gray-600 border border-gray-500 rounded-md text-gray-100 w-full sm:w-auto">
                                 <input type="url" id="steamurl-edit-${userId}" value="${profile.steamProfileUrl || ''}" placeholder="URL Perfil Steam" class="mt-1 p-1 text-xs bg-gray-600 border border-gray-500 rounded-md text-gray-100 w-full sm:w-auto">
                             </div>
                             <div class="flex items-center mt-2 sm:mt-0">
-                                <select id="select-role-${userId}" class="bg-gray-600 border border-gray-500 text-gray-100 text-xs rounded-md p-1 mr-2 w-full sm:w-auto" ${!canChangeRole && profile.role === 'Admin' ? 'disabled' : ''}>
+                                <select id="select-role-${userId}" class="bg-gray-600 border border-gray-500 text-gray-100 text-xs rounded-md p-1 mr-2 w-full sm:w-auto" ${isCurrentUserAdminEditingSelf ? 'disabled' : ''}>
                                     ${defaultRoles.map(role => `<option value="${role}" ${profile.role === role ? 'selected' : ''}>${role}</option>`).join('')}
                                 </select>
-                                <button data-userid="${userId}" class="save-user-details-btn bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded" ${!canChangeRole && profile.role === 'Admin' ? 'disabled' : ''}>Salvar</button>
+                                <button data-userid="${userId}" class="save-user-details-btn bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded" ${isCurrentUserAdminEditingSelf ? 'disabled' : ''}>Salvar</button>
                             </div>
                         </div>
                     `;
@@ -986,7 +1066,8 @@
                     steamProfileUrl: newSteamUrl
                 });
                 showModal(`Detalhes do usuário atualizados.`, "success");
-                document.getElementById(`role-display-${userId}`).textContent = newRole; 
+                const roleDisplaySpan = document.getElementById(`role-display-${userId}`);
+                if (roleDisplaySpan) roleDisplaySpan.textContent = newRole; 
             } catch (error) {
                 console.error("Error updating user details by admin:", error);
                 showModal("Erro ao atualizar detalhes do usuário: " + error.message, "error");
@@ -994,14 +1075,18 @@
         }
 
 
-        document.getElementById('create-category-form').addEventListener('submit', async (e) => {
+        async function handleCreateCategory(e) {
             e.preventDefault();
              if (!hasPermission(PERMISSIONS.MANAGE_CATEGORIES)) {
                  showModal("Você não tem permissão para criar categorias.", "error"); return;
             }
-            const name = categoryNameInput.value; 
-            const description = categoryDescriptionInput.value; 
+            const name = categoryNameInput.value.trim(); 
+            const description = categoryDescriptionInput.value.trim(); 
+            if (!name) {
+                showModal("O nome da categoria é obrigatório.", "error"); return;
+            }
             try {
+                const userDisplayNameForActivity = userProfileData?.nickname || userProfileData?.displayName || (currentUser?.email?.split('@')[0] || "Sistema");
                 await addDoc(categoriesCol, {
                     name,
                     description,
@@ -1013,8 +1098,8 @@
                     lastActivityDetails: { 
                         topicId: null,
                         topicTitle: "Nenhum tópico ainda",
-                        userId: null,
-                        userDisplayName: "",
+                        userId: currentUserId, 
+                        userDisplayName: userDisplayNameForActivity,
                         timestamp: Timestamp.now()
                     }
                 });
@@ -1024,18 +1109,17 @@
                 console.error("Error creating category:", error);
                 showModal("Erro ao criar categoria: " + error.message);
             }
-        });
+        }
 
         async function loadCategories() {
-            if (!db || !categoriesCol || !userProfilesCol) { 
-                showModal("Serviço de banco de dados indisponível para carregar categorias."); 
+            if (!db || !categoriesCol || !userProfilesCol || !categoriesList) { 
+                if(categoriesList) categoriesList.innerHTML = '<div class="p-4 text-center text-red-400">Erro: Serviço de banco de dados indisponível.</div>';
                 showView('forumHome'); 
-                categoriesList.innerHTML = '<div class="p-4 text-center text-red-400">Erro: Serviço de banco de dados indisponível.</div>';
                 return; 
             }
-            if (!currentUser) {
-                console.log("loadCategories called without current user, exiting.");
-                return;
+            if (!currentUser) { 
+                console.log("loadCategories called without current user, redirecting to login.");
+                showView('login'); return;
             }
             showView('loading');
             updateBreadcrumbs([]);
@@ -1052,26 +1136,31 @@
                     return;
                 }
 
-                let categoriesHtml = '';
                 const userIdsForLastActivity = new Set();
                 snapshot.docs.forEach(doc => {
                     const activityUserId = doc.data().lastActivityDetails?.userId;
-                    if (activityUserId) {
-                        userIdsForLastActivity.add(activityUserId);
-                    }
+                    if (activityUserId) userIdsForLastActivity.add(activityUserId);
+                    const createdById = doc.data().createdBy; 
+                    if (createdById) userIdsForLastActivity.add(createdById);
                 });
 
                 const activityUserProfiles = {};
                 if (userIdsForLastActivity.size > 0) {
-                    const profileQuery = query(userProfilesCol, where("__name__", "in", Array.from(userIdsForLastActivity)));
+                    const profilePromises = Array.from(userIdsForLastActivity).map(uid => getDoc(doc(userProfilesCol, uid)));
                     try {
-                        const profileSnaps = await getDocs(profileQuery);
-                        profileSnaps.forEach(snap => activityUserProfiles[snap.id] = snap.data().nickname || snap.data().displayName || snap.data().email);
+                        const profileSnaps = await Promise.all(profilePromises);
+                        profileSnaps.forEach(snap => {
+                            if (snap.exists()) {
+                                const data = snap.data();
+                                activityUserProfiles[snap.id] = data.nickname || data.displayName || data.email?.split('@')[0] || 'Desconhecido';
+                            } else {
+                                activityUserProfiles[snap.id] = 'Usuário Deletado';
+                            }
+                        });
                     } catch (err) {
                         console.error("Error fetching user profiles for category last activity:", err);
                     }
                 }
-
 
                 const sortedDocs = snapshot.docs.sort((a, b) => {
                     const timeA = a.data().lastActivityDetails?.timestamp?.seconds || a.data().createdAt?.seconds || 0;
@@ -1079,16 +1168,19 @@
                     return timeB - timeA; 
                 }); 
 
+                let categoriesHtml = '';
                 sortedDocs.forEach(doc => {
                     const category = doc.data();
                     const lastActivity = category.lastActivityDetails;
                     let lastActivityHtml = 'Nenhuma atividade recente.';
-                    if (lastActivity && lastActivity.topicId) {
+                    if (lastActivity && lastActivity.topicId && lastActivity.topicTitle !== "Nenhum tópico ainda") {
                         const userName = activityUserProfiles[lastActivity.userId] || 'Desconhecido';
                         lastActivityHtml = `
-                            Último: <a href="#" class="text-blue-400 hover:underline" data-topic-id-link="${lastActivity.topicId}" data-topic-title-link="${lastActivity.topicTitle}">${lastActivity.topicTitle}</a><br>
+                            Último: <a href="#" class="text-blue-400 hover:underline" data-topic-id-link="${lastActivity.topicId}" data-topic-title-link="${lastActivity.topicTitle}" data-category-id-for-topic="${doc.id}" data-category-name-for-topic="${category.name}">${lastActivity.topicTitle}</a><br>
                             por ${userName}, ${formatTimestamp(lastActivity.timestamp)}
                         `;
+                    } else if (lastActivity && lastActivity.userDisplayName) { 
+                         lastActivityHtml = `Criada por ${activityUserProfiles[lastActivity.userId] || lastActivity.userDisplayName}, ${formatTimestamp(lastActivity.timestamp)}`;
                     }
 
 
@@ -1096,10 +1188,10 @@
                         <div class="bg-gray-800 p-4 rounded-lg shadow hover:shadow-xl transition-shadow duration-200">
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <h3 class="text-xl font-semibold text-blue-400 hover:text-blue-300 cursor-pointer" data-id="${doc.id}" data-name="${category.name}">${category.name}</h3>
-                                    <p class="text-gray-400 text-sm mt-1">${category.description}</p>
+                                    <h3 class="text-xl font-semibold text-blue-400 hover:text-blue-300 cursor-pointer category-link" data-id="${doc.id}" data-name="${category.name}">${category.name}</h3>
+                                    <p class="text-gray-400 text-sm mt-1">${category.description || 'Sem descrição.'}</p>
                                 </div>
-                                ${hasPermission(PERMISSIONS.MANAGE_CATEGORIES) ? `<button class="delete-category-btn text-red-500 hover:text-red-400 text-xs ml-2" data-id="${doc.id}">Excluir</button>` : ''}
+                                ${hasPermission(PERMISSIONS.MANAGE_CATEGORIES) ? `<button class="delete-category-btn text-red-500 hover:text-red-400 text-xs ml-2" data-id="${doc.id}" data-name="${category.name}">Excluir</button>` : ''}
                             </div>
                             <div class="grid grid-cols-3 gap-2 text-xs text-gray-500 mt-3 pt-3 border-t border-gray-700">
                                 <div>Tópicos: ${category.topicCount || 0}</div>
@@ -1110,12 +1202,14 @@
                     `;
                 });
                 categoriesList.innerHTML = categoriesHtml;
-                document.querySelectorAll('a[data-topic-id-link]').forEach(link => {
+                categoriesList.querySelectorAll('a[data-topic-id-link]').forEach(link => {
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation(); 
                         const topicId = e.target.dataset.topicIdLink;
                         const topicTitle = e.target.dataset.topicTitleLink;
+                        currentCategoryId = e.target.dataset.categoryIdForTopic; 
+                        currentCategoryName = e.target.dataset.categoryNameForTopic;
                         loadPosts(topicId, topicTitle);
                     });
                 });
@@ -1123,7 +1217,7 @@
                 showView('forumHome');
             }, (error) => {
                 console.error("Error loading categories:", error);
-                 if (currentUser) { 
+                 if (currentUser && categoriesList) { 
                     categoriesList.innerHTML = '<div class="p-6 text-center text-red-400 bg-gray-800 rounded-lg shadow">Erro ao carregar categorias. Verifique as permissões do Firestore e a conexão.</div>';
                     showModal("Erro ao carregar categorias: " + error.message + ". Verifique as permissões do Firestore.");
                  }
@@ -1131,26 +1225,29 @@
             });
         }
         
-        categoriesList.addEventListener('click', (e) => {
+        function handleCategoryListClick(e) {
             if (e.target.classList.contains('delete-category-btn')) {
                 e.stopPropagation(); 
                 const categoryId = e.target.dataset.id;
-                confirmAction("Tem certeza que deseja excluir esta categoria e todos os seus tópicos e posts?", async () => {
+                const categoryName = e.target.dataset.name;
+                confirmAction(`Tem certeza que deseja excluir a categoria "${categoryName}" e todos os seus tópicos e posts?`, async () => {
                     if (!db) { showModal("Serviço de banco de dados indisponível."); return; }
                     await deleteCategory(categoryId);
                 });
-            } else if (e.target.closest('[data-id][data-name]')) { 
-                const categoryElement = e.target.closest('[data-id][data-name]');
-                loadTopics(categoryElement.dataset.id, categoryElement.dataset.name);
+            } else {
+                const categoryLink = e.target.closest('.category-link');
+                if (categoryLink && categoryLink.dataset.id) { 
+                     loadTopics(categoryLink.dataset.id, categoryLink.dataset.name);
+                }
             }
-        });
+        }
 
         async function deleteCategory(categoryId) {
             if (!hasPermission(PERMISSIONS.MANAGE_CATEGORIES)) {
                  showModal("Você não tem permissão para deletar categorias.", "error"); return;
             }
+            showModal("Excluindo categoria...", "info");
             try {
-                showModal("Excluindo categoria...", "info");
                 const topicsInCatQuery = query(topicsCol, where("categoryId", "==", categoryId));
                 const topicsInCatSnapshot = await getDocs(topicsInCatQuery);
                 for (const topicDoc of topicsInCatSnapshot.docs) {
@@ -1165,14 +1262,29 @@
                 showModal("Categoria excluída com sucesso!", "success");
             } catch (error) {
                 console.error("Error deleting category:", error);
-                showModal("Erro ao excluir categoria: " + error.message);
+                showModal("Erro ao excluir categoria: " + error.message, "error");
             }
         }
 
         let currentCategoryName = '';
         let currentCategoryId = null;
 
-        document.getElementById('create-topic-form-modal').addEventListener('submit', async (e) => {
+        function openCreateTopicModal() {
+            if (!hasPermission(PERMISSIONS.CREATE_TOPIC)) {
+                 showModal("Você não tem permissão para criar tópicos.", "error"); return;
+            }
+            if (!currentCategoryId) {
+                showModal("Selecione uma categoria antes de criar um tópico.", "error"); return;
+            }
+            if (newTopicTitleInput) newTopicTitleInput.value = ''; 
+            if (newTopicContentInput) newTopicContentInput.value = ''; 
+            if (newTopicCommandInput) newTopicCommandInput.value = '';
+            
+            const createTopicModal = document.getElementById('create-topic-modal');
+            if(createTopicModal) createTopicModal.style.display = 'flex';
+        }
+        
+        async function handleCreateTopic(e) {
             e.preventDefault();
             if (!hasPermission(PERMISSIONS.CREATE_TOPIC)) {
                  showModal("Você não tem permissão para criar tópicos.", "error"); return;
@@ -1181,11 +1293,11 @@
                 showModal("Você precisa estar logado e em uma categoria para criar um tópico.");
                 return;
             }
-            const title = newTopicTitleInput.value; 
-            const content = newTopicContentInput.value; 
+            const title = newTopicTitleInput.value.trim(); 
+            const content = newTopicContentInput.value.trim(); 
             const commandToCopy = newTopicCommandInput.value.trim();
             
-            if (!title.trim() || !content.trim()) {
+            if (!title || !content) {
                 showModal("Título e conteúdo do primeiro post são obrigatórios.");
                 return;
             }
@@ -1198,16 +1310,20 @@
                     categoryId: currentCategoryId,
                     title,
                     createdBy: currentUserId,
+                    userDisplayName: userDisplayName, 
                     createdAt: now,
                     replyCount: 0, 
+                    postCount: 1, 
                     lastReplyAt: now,
                     lastReplyBy: currentUserId,
+                    lastReplyByDisplayName: userDisplayName,
                     viewCount: 0
                 });
 
                 await addDoc(postsCol, {
                     topicId: topicRef.id,
                     userId: currentUserId,
+                    userDisplayName: userDisplayName,
                     content,
                     createdAt: now,
                     commandToCopy: commandToCopy || null 
@@ -1216,7 +1332,7 @@
                 const categoryRef = doc(categoriesCol, currentCategoryId);
                 await updateDoc(categoryRef, {
                     topicCount: increment(1),
-                    postCount: increment(1),
+                    postCount: increment(1), 
                     lastActivity: now, 
                     lastActivityDetails: {
                         topicId: topicRef.id,
@@ -1228,46 +1344,23 @@
                 });
                 
                 showModal("Tópico criado com sucesso!", "success");
-                document.getElementById('create-topic-form-modal').reset(); 
-                document.getElementById('create-topic-modal').style.display = 'none';
+                if (document.getElementById('create-topic-form-modal')) document.getElementById('create-topic-form-modal').reset(); 
+                if (document.getElementById('create-topic-modal')) document.getElementById('create-topic-modal').style.display = 'none';
             } catch (error) {
                 console.error("Error creating topic:", error);
                 showModal("Erro ao criar tópico: " + error.message);
             }
-        });
-        
-        document.getElementById('show-create-topic-modal').addEventListener('click', () => {
-            if (!hasPermission(PERMISSIONS.CREATE_TOPIC)) {
-                 showModal("Você não tem permissão para criar tópicos.", "error"); return;
-            }
-            newTopicTitleInput.value = ''; 
-            newTopicContentInput.value = ''; 
-            newTopicCommandInput.value = '';
-            // Ensure poll related elements are not accessed if they don't exist
-            const pollQuestionElem = document.getElementById('new-topic-poll-question');
-            if(pollQuestionElem) pollQuestionElem.value = '';
-            for (let i = 1; i <= 4; i++) {
-                const optionInput = document.getElementById(`new-topic-poll-option-${i}`);
-                if (optionInput) optionInput.value = '';
-            }
-            document.getElementById('create-topic-modal').style.display = 'flex';
-        });
-        document.getElementById('cancel-create-topic').addEventListener('click', () => {
-            document.getElementById('create-topic-modal').style.display = 'none';
-        });
+        }
 
 
         async function loadTopics(categoryId, categoryName) {
-            if (!db || !topicsCol || !userProfilesCol) { 
-                showModal("Serviço de banco de dados indisponível para carregar tópicos."); 
+            if (!db || !topicsCol || !userProfilesCol || !topicsList || !categoryTitle) { 
+                if(topicsList) topicsList.innerHTML = '<div class="p-4 text-center text-red-400">Erro: Serviço de banco de dados indisponível.</div>';
                 showView('category');
-                topicsList.innerHTML = '<div class="p-4 text-center text-red-400">Erro: Serviço de banco de dados indisponível.</div>';
                 return; 
             }
-            if (!currentUser) {
-                console.log("loadTopics called without current user, exiting.");
-                return;
-            }
+            if (!currentUser) { showView('login'); return; }
+
             showView('loading');
             currentCategoryId = categoryId;
             currentCategoryName = categoryName;
@@ -1286,7 +1379,6 @@
                     return;
                 }
 
-                let topicsHtml = '';
                 const userIds = new Set();
                 snapshot.docs.forEach(doc => {
                     const data = doc.data();
@@ -1296,13 +1388,21 @@
 
                 const profiles = {};
                 if (userIds.size > 0) {
-                    const profileQuery = query(userProfilesCol, where("__name__", "in", Array.from(userIds)));
+                    const profilePromises = Array.from(userIds).map(uid => getDoc(doc(userProfilesCol, uid)));
                      try {
-                        const profileSnaps = await getDocs(profileQuery);
-                        profileSnaps.forEach(snap => profiles[snap.id] = snap.data()); 
-                    } catch (err) {
-                        console.error("Error fetching user profiles for topics:", err);
-                    }
+                        const profileSnaps = await Promise.all(profilePromises);
+                        profileSnaps.forEach(snap => {
+                            if (snap.exists()) {
+                                const data = snap.data();
+                                profiles[snap.id] = {
+                                    displayName: data.nickname || data.displayName || data.email?.split('@')[0] || 'Desconhecido',
+                                    role: data.role || 'Membro' 
+                                };
+                            } else {
+                                profiles[snap.id] = { displayName: 'Usuário Deletado', role: 'Membro' };
+                            }
+                        });
+                    } catch (err) { console.error("Error fetching user profiles for topics:", err); }
                 }
                 
                 const sortedDocs = snapshot.docs.sort((a,b) => {
@@ -1311,30 +1411,28 @@
                     return timeB - timeA;
                 });
 
+                let topicsHtml = '';
                 sortedDocs.forEach(doc => {
                     const topic = doc.data();
-                    const createdByUserProfile = profiles[topic.createdBy];
-                    const createdByDisplayName = createdByUserProfile?.nickname || createdByUserProfile?.displayName || createdByUserProfile?.email?.split('@')[0] || 'Desconhecido';
-                    const lastReplyByUserProfile = profiles[topic.lastReplyBy];
-                    const lastReplyByDisplayName = lastReplyByUserProfile?.nickname || lastReplyByUserProfile?.displayName || lastReplyByUserProfile?.email?.split('@')[0] || 'N/A';
+                    const createdByDisplayName = profiles[topic.createdBy]?.displayName || topic.userDisplayName || 'Desconhecido';
+                    const lastReplyByDisplayName = profiles[topic.lastReplyBy]?.displayName || topic.lastReplyByDisplayName || 'N/A';
                     
                     let deleteBtnHtml = '';
                     if (hasPermission(PERMISSIONS.DELETE_ANY_TOPIC) || (hasPermission(PERMISSIONS.DELETE_OWN_TOPIC) && currentUser.uid === topic.createdBy)) {
-                        deleteBtnHtml = `<button class="delete-topic-btn text-red-500 hover:text-red-400 text-xs ml-2 self-start p-1" data-id="${doc.id}">Excluir</button>`;
+                        deleteBtnHtml = `<button class="delete-topic-btn text-red-500 hover:text-red-400 text-xs ml-2 self-start p-1" data-id="${doc.id}" data-title="${topic.title}">Excluir</button>`;
                     }
 
                     topicsHtml += `
-                        <div class="bg-gray-800 p-4 rounded-lg shadow flex justify-between items-center hover:bg-gray-700 transition-colors duration-150">
+                        <div class="bg-gray-800 p-4 rounded-lg shadow flex justify-between items-center hover:bg-gray-700 transition-colors duration-150 topic-link-container">
                             <div class="flex-grow">
-                                <h4 class="text-lg font-medium text-blue-400 hover:text-blue-300 cursor-pointer" data-id="${doc.id}" data-title="${topic.title}">${topic.title}</h4>
+                                <h4 class="text-lg font-medium text-blue-400 hover:text-blue-300 cursor-pointer topic-title-link" data-id="${doc.id}" data-title="${topic.title}">${topic.title}</h4>
                                 <p class="text-xs text-gray-500">
                                     Criado por: <a href="#" class="text-blue-300 hover:underline user-profile-link" data-userid="${topic.createdBy}">${createdByDisplayName}</a> (${formatTimestamp(topic.createdAt)})
                                 </p>
-                                <p class="text-xs text-gray-500">Visualizações: ${topic.viewCount || 0}</p>
+                                <p class="text-xs text-gray-500">Visualizações: ${topic.viewCount || 0} | Respostas: ${topic.replyCount || 0}</p>
                             </div>
-                            <div class="text-right text-sm flex-shrink-0 ml-4 w-40">
-                                <p>${topic.replyCount || 0} respostas</p>
-                                <p class="text-xs text-gray-500">Última por: <a href="#" class="text-blue-300 hover:underline user-profile-link" data-userid="${topic.lastReplyBy}">${lastReplyByDisplayName}</a></p>
+                            <div class="text-right text-sm flex-shrink-0 ml-4 w-48">
+                                <p class="truncate">Última por: <a href="#" class="text-blue-300 hover:underline user-profile-link" data-userid="${topic.lastReplyBy}">${lastReplyByDisplayName}</a></p>
                                 <p class="text-xs text-gray-500">${formatTimestamp(topic.lastReplyAt)}</p>
                             </div>
                             ${deleteBtnHtml}
@@ -1346,7 +1444,7 @@
                 showView('category');
             }, (error) => {
                 console.error("Error loading topics:", error);
-                if(currentUser) {
+                if(currentUser && topicsList) {
                     topicsList.innerHTML = '<div class="p-6 text-center text-red-400 bg-gray-800 rounded-lg shadow">Erro ao carregar tópicos.</div>';
                     showModal("Erro ao carregar tópicos: " + error.message);
                 }
@@ -1354,11 +1452,12 @@
             });
         }
 
-        topicsList.addEventListener('click', async (e) => {
+        async function handleTopicListClick(e) {
             if (e.target.classList.contains('delete-topic-btn')) {
                  e.stopPropagation();
                  const topicId = e.target.dataset.id;
-                 confirmAction("Tem certeza que deseja excluir este tópico e todos os seus posts?", async () => {
+                 const topicTitle = e.target.dataset.title;
+                 confirmAction(`Tem certeza que deseja excluir o tópico "${topicTitle}" e todos os seus posts?`, async () => {
                     if (!db) { showModal("Serviço de banco de dados indisponível."); return; }
                     await deleteTopic(topicId);
                 });
@@ -1367,34 +1466,36 @@
                 e.stopPropagation();
                 const userIdToShow = e.target.dataset.userid;
                 if (userIdToShow) showView('userProfile', { userId: userIdToShow });
-            } else if (e.target.closest('[data-id][data-title]')) {
-                const topicElement = e.target.closest('[data-id][data-title]');
-                const topicId = topicElement.dataset.id;
-                const topicTitle = topicElement.dataset.title;
-                
-                const topicRef = doc(topicsCol, topicId);
-                try {
-                    await updateDoc(topicRef, { viewCount: increment(1) });
-                } catch (viewError) {
-                    console.warn("Could not update view count:", viewError.message); 
+            } else {
+                const topicLink = e.target.closest('.topic-link-container')?.querySelector('.topic-title-link');
+                if (topicLink && topicLink.dataset.id) {
+                    const topicId = topicLink.dataset.id;
+                    const topicTitle = topicLink.dataset.title;
+                    
+                    const topicRef = doc(topicsCol, topicId);
+                    try { 
+                        await updateDoc(topicRef, { viewCount: increment(1) });
+                    } catch (viewError) {
+                        console.warn("Could not update view count:", viewError.message); 
+                    }
+                    loadPosts(topicId, topicTitle);
                 }
-                loadPosts(topicId, topicTitle);
             }
-        });
+        }
 
         async function deleteTopic(topicId) {
             const topicRef = doc(topicsCol, topicId);
             const topicSnap = await getDoc(topicRef);
             if (!topicSnap.exists()) {
-                showModal("Tópico não encontrado."); return;
+                showModal("Tópico não encontrado.", "error"); return;
             }
             const topicData = topicSnap.data();
             if (!hasPermission(PERMISSIONS.DELETE_ANY_TOPIC) && !(hasPermission(PERMISSIONS.DELETE_OWN_TOPIC) && currentUser.uid === topicData.createdBy)) {
                 showModal("Você não tem permissão para excluir este tópico.", "error"); return;
             }
 
+            showModal("Excluindo tópico e seus posts...", "info");
             try {
-                showModal("Excluindo tópico e seus posts...", "info");
                 const postsInTopicQuery = query(postsCol, where("topicId", "==", topicId));
                 const postsSnapshot = await getDocs(postsInTopicQuery);
                 let postsDeletedCount = 0;
@@ -1404,24 +1505,32 @@
                 }
                 await deleteDoc(topicRef);
 
-                if (currentCategoryId) { 
-                    const categoryRef = doc(categoriesCol, currentCategoryId); 
-                    await updateDoc(categoryRef, {
-                        topicCount: increment(-1),
-                        postCount: increment(-postsDeletedCount)
-                    });
+                if (topicData.categoryId) { 
+                    const categoryRef = doc(categoriesCol, topicData.categoryId); 
+                    const categorySnap = await getDoc(categoryRef);
+                    if (categorySnap.exists()) {
+                        const categoryData = categorySnap.data();
+                        let updateData = {
+                            topicCount: increment(-1),
+                            postCount: increment(-postsDeletedCount)
+                        };
+                        if (categoryData.lastActivityDetails && categoryData.lastActivityDetails.topicId === topicId) {
+                            console.log("Deleted topic was last active in category. LastActivityDetails might be stale until new activity.");
+                        }
+                        await updateDoc(categoryRef, updateData);
+                    }
                 }
                 showModal("Tópico excluído com sucesso!", "success");
             } catch (error) {
                 console.error("Error deleting topic:", error);
-                showModal("Erro ao excluir tópico: " + error.message);
+                showModal("Erro ao excluir tópico: " + error.message, "error");
             }
         }
 
         let currentTopicId = null;
         let currentTopicTitle = '';
 
-        document.getElementById('create-post-form').addEventListener('submit', async (e) => {
+        async function handleCreatePost(e) {
             e.preventDefault();
             if (!hasPermission(PERMISSIONS.CREATE_POST)) {
                  showModal("Você não tem permissão para criar posts.", "error"); return;
@@ -1430,8 +1539,8 @@
                 showModal("Você precisa estar logado e em um tópico para postar.");
                 return;
             }
-            const content = e.target.content.value;
-            if (!content.trim()) {
+            const content = e.target.content.value.trim();
+            if (!content) {
                 showModal("O conteúdo da postagem não pode estar vazio.");
                 return;
             }
@@ -1443,30 +1552,28 @@
                 await addDoc(postsCol, {
                     topicId: currentTopicId,
                     userId: currentUserId,
+                    userDisplayName: userDisplayName, 
                     content,
                     createdAt: now
                 });
 
                 const topicRef = doc(topicsCol, currentTopicId);
-                const topicSnap = await getDoc(topicRef); 
-                let topicTitleForCategory = "Tópico";
-                if (topicSnap.exists()) {
-                    topicTitleForCategory = topicSnap.data().title;
-                    await updateDoc(topicRef, {
-                        replyCount: increment(1),
-                        lastReplyAt: now,
-                        lastReplyBy: currentUserId
-                    });
-                }
+                await updateDoc(topicRef, {
+                    replyCount: increment(1),
+                    postCount: increment(1), 
+                    lastReplyAt: now,
+                    lastReplyBy: currentUserId,
+                    lastReplyByDisplayName: userDisplayName
+                });
                 
                 if(currentCategoryId) { 
                     const categoryRef = doc(categoriesCol, currentCategoryId); 
                     await updateDoc(categoryRef, {
-                        postCount: increment(1),
+                        postCount: increment(1), 
                         lastActivity: now,
                         lastActivityDetails: {
                             topicId: currentTopicId,
-                            topicTitle: topicTitleForCategory,
+                            topicTitle: currentTopicTitle, 
                             userId: currentUserId,
                             userDisplayName: userDisplayName,
                             timestamp: now
@@ -1479,67 +1586,90 @@
                 console.error("Error creating post:", error);
                 showModal("Erro ao criar postagem: " + error.message);
             }
-        });
+        }
 
-        async function loadPosts(topicId, topicTitle) {
-            if (!db || !postsCol || !userProfilesCol || !topicsCol) { 
-                showModal("Serviço de banco de dados indisponível para carregar posts."); 
+        async function loadPosts(topicId, topicTitleFromLink) {
+            if (!db || !postsCol || !userProfilesCol || !topicsCol || !postsList || !topicTitleFull) { 
+                if(postsList) postsList.innerHTML = '<div class="p-4 text-center text-red-400">Erro: Serviço de banco de dados indisponível.</div>';
                 showView('topic');
-                postsList.innerHTML = '<div class="p-4 text-center text-red-400">Erro: Serviço de banco de dados indisponível.</div>';
                 return; 
             }
-            if (!currentUser) {
-                console.log("loadPosts called without current user, exiting.");
-                return;
-            }
+            if (!currentUser) { showView('login'); return; }
+
             showView('loading');
             currentTopicId = topicId;
-            currentTopicTitle = topicTitle;
-            topicTitleFull.textContent = topicTitle;
+            currentTopicTitle = topicTitleFromLink; 
+            topicTitleFull.textContent = currentTopicTitle;
+
+            if (!currentCategoryId || !currentCategoryName) {
+                try {
+                    const topicDoc = await getDoc(doc(topicsCol, topicId));
+                    if (topicDoc.exists()) {
+                        const topicData = topicDoc.data();
+                        if (topicData.categoryId) {
+                            currentCategoryId = topicData.categoryId;
+                            const categoryDoc = await getDoc(doc(categoriesCol, currentCategoryId));
+                            if (categoryDoc.exists()) {
+                                currentCategoryName = categoryDoc.data().name;
+                            } else { currentCategoryName = "Categoria Desconhecida"; }
+                        } else { currentCategoryName = "Categoria Desconhecida"; }
+                    } else { currentCategoryName = "Categoria Desconhecida"; }
+                } catch (err) {
+                    console.error("Error fetching category details for breadcrumbs:", err);
+                    currentCategoryName = "Categoria"; 
+                }
+            }
             updateBreadcrumbs([
                 {name: currentCategoryName || "Categoria", view: 'category', id: currentCategoryId}, 
-                {name: topicTitle, view: 'topic', id: topicId}
+                {name: currentTopicTitle, view: 'topic', id: topicId}
             ]);
 
-            document.getElementById('topic-poll-container').innerHTML = ''; // Clear poll container as it's removed
-
+            if (document.getElementById('topic-poll-container')) document.getElementById('topic-poll-container').innerHTML = ''; 
 
             postsList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando postagens...</p>';
-            const q = query(postsCol, where("topicId", "==", topicId)); 
+            const q = query(postsCol, where("topicId", "==", topicId), orderBy("createdAt", "asc")); 
 
             if(unsubscribePosts) unsubscribePosts();
             unsubscribePosts = onSnapshot(q, async (snapshot) => {
                 if (!currentUser) return;
                 if (snapshot.empty) {
-                    postsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhuma postagem encontrada neste tópico. Seja o primeiro a responder!</div>';
+                    const topicSnap = await getDoc(doc(topicsCol, topicId));
+                    if (!topicSnap.exists()) {
+                        postsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Este tópico não existe mais ou foi movido.</div>';
+                        showModal("Tópico não encontrado.", "error");
+                    } else {
+                        postsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhuma postagem encontrada neste tópico. Seja o primeiro a responder!</div>';
+                    }
                      showView('topic');
                     return;
                 }
 
-                let postsHtml = '';
-                const userIds = new Set(snapshot.docs.map(doc => doc.data().userId).filter(id => id));
+                const userIds = new Set(snapshot.docs.map(d => d.data().userId).filter(id => id));
                 const profiles = {};
                  if (userIds.size > 0) {
-                    const profileQuery = query(userProfilesCol, where("__name__", "in", Array.from(userIds)));
+                    const profilePromises = Array.from(userIds).map(uid => getDoc(doc(userProfilesCol, uid)));
                      try {
-                        const profileSnaps = await getDocs(profileQuery);
-                        profileSnaps.forEach(snap => profiles[snap.id] = snap.data()); 
-                    } catch (err) {
-                        console.error("Error fetching user profiles for posts:", err);
-                    }
+                        const profileSnaps = await Promise.all(profilePromises);
+                        profileSnaps.forEach(snap => {
+                            if (snap.exists()) {
+                                const data = snap.data();
+                                profiles[snap.id] = {
+                                    displayName: data.nickname || data.displayName || data.email?.split('@')[0] || 'Desconhecido',
+                                    role: data.role || 'Membro'
+                                };
+                            } else {
+                                profiles[snap.id] = { displayName: 'Usuário Deletado', role: 'Membro' };
+                            }
+                        });
+                    } catch (err) { console.error("Error fetching user profiles for posts:", err); }
                 }
                 
-                const sortedDocs = snapshot.docs.sort((a,b) => {
-                    const timeA = a.data().createdAt?.seconds || 0;
-                    const timeB = b.data().createdAt?.seconds || 0;
-                    return timeA - timeB;
-                });
-
-                sortedDocs.forEach((postDoc, index) => {
+                let postsHtml = '';
+                snapshot.docs.forEach((postDoc, index) => {
                     const post = postDoc.data();
                     const userProfile = profiles[post.userId];
-                    const displayName = userProfile?.nickname || userProfile?.displayName || userProfile?.email?.split('@')[0] || 'Desconhecido';
-                    const userRole = userProfile?.role || 'Membro';
+                    const displayName = userProfile?.displayName || post.userDisplayName || 'Desconhecido';
+                    const userRole = userProfile?.role || 'Membro'; 
                     const roleColor = currentRoleColors[userRole] || '#6b7280'; 
                     const postContent = post.content ? post.content.replace(/\n/g, '<br>') : ""; 
 
@@ -1550,12 +1680,11 @@
                     
                     let actionsHtml = '';
                     if (hasPermission(PERMISSIONS.EDIT_ANY_POST) || (hasPermission(PERMISSIONS.EDIT_OWN_POST) && currentUser.uid === post.userId)) {
-                        actionsHtml += `<button class="edit-post-btn text-yellow-500 hover:text-yellow-400 text-xs mt-2 p-1 mr-2" data-post-id="${postDoc.id}" data-post-content="${post.content}">Editar</button>`;
+                        actionsHtml += `<button class="edit-post-btn text-yellow-500 hover:text-yellow-400 text-xs mt-2 p-1 mr-2" data-post-id="${postDoc.id}">Editar</button>`;
                     }
                     if (hasPermission(PERMISSIONS.DELETE_ANY_POST) || (hasPermission(PERMISSIONS.DELETE_OWN_POST) && currentUser.uid === post.userId)) { 
                          actionsHtml += `<button class="delete-post-btn text-red-500 hover:text-red-400 text-xs mt-2 p-1" data-id="${postDoc.id}" data-topic-id="${post.topicId}">Excluir</button>`;
                     }
-
 
                     postsHtml += `
                         <div class="bg-gray-800 p-4 rounded-lg shadow mb-4">
@@ -1564,7 +1693,7 @@
                                     <a href="#" class="user-profile-link hover:underline" data-userid="${post.userId}">${displayName}</a>
                                     <span class="role-tag" style="background-color: ${roleColor};">${userRole}</span>
                                 </p>
-                                <p class="text-xs text-gray-500">${formatTimestamp(post.createdAt)}</p>
+                                <p class="text-xs text-gray-500">${formatTimestamp(post.createdAt)} ${post.lastEditedAt ? `(editado ${formatTimestamp(post.lastEditedAt)})` : ''}</p>
                             </div>
                             <div id="post-content-${postDoc.id}" class="text-gray-300">${postContent}</div>
                             ${commandButtonHtml}
@@ -1575,19 +1704,24 @@
                 postsList.innerHTML = postsHtml;
                 addProfileLinkListeners(postsList);
                 postsList.querySelectorAll('.copy-post-command-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        copyToClipboard(e.target.dataset.command);
-                    });
+                    button.addEventListener('click', (e) => copyToClipboard(e.target.dataset.command));
                 });
                 postsList.querySelectorAll('.edit-post-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        openEditPostModal(e.target.dataset.postId, document.getElementById(`post-content-${e.target.dataset.postId}`).innerHTML.replace(/<br\s*\/?>/gi, '\n'));
+                    button.addEventListener('click', async (e) => {
+                        const postId = e.target.dataset.postId;
+                        const postRef = doc(postsCol, postId);
+                        const postSnap = await getDoc(postRef);
+                        if (postSnap.exists()) {
+                            openEditPostModal(postId, postSnap.data().content);
+                        } else {
+                            showModal("Post não encontrado para editar.", "error");
+                        }
                     });
                 });
                 showView('topic');
             }, (error) => {
                 console.error("Error loading posts:", error);
-                if (currentUser) {
+                if (currentUser && postsList) {
                     postsList.innerHTML = '<div class="p-6 text-center text-red-400 bg-gray-800 rounded-lg shadow">Erro ao carregar postagens.</div>';
                     showModal("Erro ao carregar postagens: " + error.message);
                 }
@@ -1595,13 +1729,13 @@
             });
         }
 
-        postsList.addEventListener('click', async (e) => {
+        async function handlePostListClick(e) {
             if (e.target.classList.contains('delete-post-btn')) {
                 const postId = e.target.dataset.id;
                 const postRef = doc(postsCol, postId);
-                const postSnap = await getDoc(postRef);
+                const postSnap = await getDoc(postRef); 
                 if (!postSnap.exists()) {
-                    showModal("Post não encontrado."); return;
+                    showModal("Post não encontrado.", "error"); return;
                 }
                 const postData = postSnap.data();
                 if (!hasPermission(PERMISSIONS.DELETE_ANY_POST) && !(hasPermission(PERMISSIONS.DELETE_OWN_POST) && currentUser.uid === postData.userId)) {
@@ -1610,10 +1744,13 @@
 
                 confirmAction("Tem certeza que deseja excluir este post?", async () => {
                     try {
-                        await deleteDoc(postRef);
+                        await deleteDoc(postRef); 
                         if (postData.topicId) {
                             const topicRef = doc(topicsCol, postData.topicId);
-                            await updateDoc(topicRef, { replyCount: increment(-1) });
+                            await updateDoc(topicRef, { 
+                                replyCount: increment(-1),
+                                postCount: increment(-1) 
+                            });
                         }
                         if(currentCategoryId) { 
                             const categoryRef = doc(categoriesCol, currentCategoryId);
@@ -1622,7 +1759,7 @@
                         showModal("Post excluído com sucesso!", "success");
                     } catch (error) {
                         console.error("Error deleting post:", error);
-                        showModal("Erro ao excluir post: " + error.message);
+                        showModal("Erro ao excluir post: " + error.message, "error");
                     }
                 });
             } else if (e.target.classList.contains('user-profile-link')) {
@@ -1630,11 +1767,15 @@
                 const userIdToShow = e.target.dataset.userid;
                 if (userIdToShow) showView('userProfile', { userId: userIdToShow });
             }
-        });
+        }
         
         function addProfileLinkListeners(parentElement) {
+            if (!parentElement) return;
             parentElement.querySelectorAll('.user-profile-link').forEach(link => {
-                link.addEventListener('click', (e) => {
+                const newLink = link.cloneNode(true);
+                link.parentNode.replaceChild(newLink, link);
+
+                newLink.addEventListener('click', (e) => {
                     e.preventDefault();
                     const userIdToShow = e.target.dataset.userid;
                     if (userIdToShow) showView('userProfile', { userId: userIdToShow });
@@ -1643,12 +1784,14 @@
         }
 
         function openEditPostModal(postId, currentContent) {
+            if (!editPostModal || !editPostContentInput) return;
             editingPostId = postId;
             editPostContentInput.value = currentContent; 
             editPostModal.style.display = 'flex';
         }
 
         async function saveEditedPost() {
+            if (!editingPostId || !editPostContentInput || !editPostModal) return;
             const postRef = doc(postsCol, editingPostId);
             const postSnap = await getDoc(postRef);
             if (!postSnap.exists()) {
@@ -1669,10 +1812,12 @@
                 await updateDoc(postRef, {
                     content: newContent,
                     lastEditedAt: Timestamp.now(),
-                    lastEditedBy: currentUserId 
+                    lastEditedBy: currentUserId, 
+                    lastEditedByDisplayName: userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0]
                 });
                 showModal("Post atualizado com sucesso!", "success");
                 editPostModal.style.display = 'none';
+                editingPostId = null;
             } catch (error) {
                 console.error("Error updating post:", error);
                 showModal("Erro ao atualizar post: " + error.message, "error");
@@ -1697,8 +1842,8 @@
                     body: JSON.stringify(payload)
                 });
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    console.error("Gemini API Error:", errorData);
+                    const errorData = await response.json().catch(() => ({ error: { message: "Resposta não JSON da API." }}));
+                    console.error("Gemini API Error Response:", errorData);
                     throw new Error(`Erro da API Gemini: ${response.status} ${response.statusText}. Detalhes: ${JSON.stringify(errorData.error?.message || errorData)}`);
                 }
                 const result = await response.json();
@@ -1719,56 +1864,56 @@
             }
         }
 
-        if (generateCategoryDescBtn) {
-            generateCategoryDescBtn.addEventListener('click', async () => {
-                const categoryName = categoryNameInput.value.trim();
-                if (!categoryName) {
-                    showModal("Por favor, insira um nome para a categoria primeiro.", "error");
-                    return;
-                }
-                const prompt = `Gere uma descrição curta e concisa (máximo 2 frases) para uma categoria de fórum chamada "${categoryName}". A descrição deve ser convidativa e em português do Brasil.`;
-                const generatedDescription = await callGeminiAPI(prompt, 'generate-category-desc-spinner');
-                if (generatedDescription) {
-                    categoryDescriptionInput.value = generatedDescription.trim();
-                    showModal("Descrição gerada pela IA!", "success");
-                }
-            });
+        async function generateCategoryDescription() {
+            if (!categoryNameInput || !categoryDescriptionInput) return;
+            const categoryName = categoryNameInput.value.trim();
+            if (!categoryName) {
+                showModal("Por favor, insira um nome para a categoria primeiro.", "error");
+                return;
+            }
+            const prompt = `Gere uma descrição curta e concisa (máximo 2 frases) para uma categoria de fórum chamada "${categoryName}". A descrição deve ser convidativa e em português do Brasil.`;
+            const generatedDescription = await callGeminiAPI(prompt, 'generate-category-desc-spinner');
+            if (generatedDescription) {
+                categoryDescriptionInput.value = generatedDescription.trim();
+                showModal("Descrição gerada pela IA!", "success");
+            }
         }
 
-        if (suggestTopicTitleBtn) {
-            suggestTopicTitleBtn.addEventListener('click', async () => {
-                const topicContent = newTopicContentInput.value.trim();
-                if (!topicContent) {
-                    showModal("Por favor, escreva o conteúdo da primeira postagem primeiro.", "error");
-                    return;
-                }
-                const prompt = `Sugira um título curto e chamativo (máximo 10 palavras) para um tópico de fórum cujo primeiro post tem o seguinte conteúdo (em português do Brasil):\n\n"${topicContent.substring(0, 500)}${topicContent.length > 500 ? '...' : ''}"\n\nO título deve ser em português do Brasil.`;
-                const suggestedTitle = await callGeminiAPI(prompt, 'suggest-topic-title-spinner');
-                if (suggestedTitle) {
-                    newTopicTitleInput.value = suggestedTitle.replace(/"/g, '').trim(); 
-                    showModal("Título sugerido pela IA!", "success");
-                }
-            });
+        async function suggestTopicTitle() {
+            if (!newTopicContentInput || !newTopicTitleInput) return;
+            const topicContent = newTopicContentInput.value.trim();
+            if (!topicContent) {
+                showModal("Por favor, escreva o conteúdo da primeira postagem primeiro.", "error");
+                return;
+            }
+            const prompt = `Sugira um título curto e chamativo (máximo 10 palavras) para um tópico de fórum cujo primeiro post tem o seguinte conteúdo (em português do Brasil):\n\n"${topicContent.substring(0, 500)}${topicContent.length > 500 ? '...' : ''}"\n\nO título deve ser em português do Brasil.`;
+            const suggestedTitle = await callGeminiAPI(prompt, 'suggest-topic-title-spinner');
+            if (suggestedTitle) {
+                newTopicTitleInput.value = suggestedTitle.replace(/"/g, '').trim(); 
+                showModal("Título sugerido pela IA!", "success");
+            }
         }
         
         // --- Profile Management ---
         function loadMyProfileView() {
-            if (!currentUser || !userProfileData) {
+            if (!currentUser || !userProfileData || !myProfileNicknameInput || !myProfileSteamUrlInput || !myProfileEmailDisplay || !myProfileRoleDisplay) {
                 showModal("Você precisa estar logado para ver seu perfil.", "error");
                 showView('login');
                 return;
             }
             myProfileNicknameInput.value = userProfileData.nickname || '';
             myProfileSteamUrlInput.value = userProfileData.steamProfileUrl || '';
-            myProfileEmailDisplay.textContent = currentUser.email;
+            myProfileEmailDisplay.textContent = currentUser.email; 
             myProfileRoleDisplay.textContent = userProfileData.role || 'Membro';
             const roleColor = currentRoleColors[userProfileData.role] || '#6b7280';
             myProfileRoleDisplay.style.backgroundColor = roleColor;
-            myProfileRoleDisplay.classList.add('role-tag');
+            if (!myProfileRoleDisplay.classList.contains('role-tag')) {
+                myProfileRoleDisplay.classList.add('role-tag');
+            }
         }
 
         async function saveMyProfile() {
-            if (!currentUser || !db) {
+            if (!currentUser || !db || !myProfileNicknameInput || !myProfileSteamUrlInput) {
                 showModal("Não foi possível salvar o perfil. Tente novamente.", "error");
                 return;
             }
@@ -1780,13 +1925,7 @@
                 await updateDoc(profileRef, {
                     nickname: newNickname,
                     steamProfileUrl: newSteamUrl,
-                    lastSeen: Timestamp.now() 
                 });
-                if(userProfileData) {
-                    userProfileData.nickname = newNickname;
-                    userProfileData.steamProfileUrl = newSteamUrl;
-                }
-                userDisplay.textContent = `Bem-vindo, ${newNickname || userProfileData.displayName || currentUser.email}`; 
                 showModal("Perfil atualizado com sucesso!", "success");
             } catch (error) {
                 console.error("Error updating profile:", error);
@@ -1795,7 +1934,10 @@
         }
 
         async function loadUserProfileView(userId) {
-            if (!db) { showModal("Serviço de banco de dados indisponível."); return; }
+            if (!db || !userProfilesCol || !userProfileViewDisplayName) { 
+                 showModal("Serviço de banco de dados indisponível ou UI não pronta."); return;
+            }
+            showView('loading'); 
             const profileRef = doc(userProfilesCol, userId);
             try {
                 const docSnap = await getDoc(profileRef);
@@ -1803,21 +1945,25 @@
                     const profile = docSnap.data();
                     userProfileViewDisplayName.textContent = profile.displayName || 'N/A';
                     userProfileViewNickname.textContent = profile.nickname || 'Nenhum';
-                    userProfileViewEmail.textContent = hasPermission(PERMISSIONS.MANAGE_USERS) ? profile.email : (profile.email ? profile.email.split('@')[0] + '@...' : 'N/A');
+                    const canViewFullEmail = hasPermission(PERMISSIONS.MANAGE_USERS) || currentUserId === userId;
+                    userProfileViewEmail.textContent = canViewFullEmail ? profile.email : (profile.email ? profile.email.split('@')[0] + '@...' : 'N/A');
+                    
                     userProfileViewRole.textContent = profile.role || 'Membro';
                     const roleColor = currentRoleColors[profile.role] || '#6b7280';
                     userProfileViewRole.style.backgroundColor = roleColor;
-                    userProfileViewRole.classList.add('role-tag');
+                    if (!userProfileViewRole.classList.contains('role-tag')) {
+                         userProfileViewRole.classList.add('role-tag');
+                    }
 
-
-                    if (profile.steamProfileUrl) {
+                    if (profile.steamProfileUrl && userProfileViewSteamLink) {
                         userProfileViewSteamLink.href = profile.steamProfileUrl;
                         userProfileViewSteamLink.textContent = profile.steamProfileUrl;
                         userProfileViewSteamLink.parentElement.style.display = 'block';
-                    } else {
+                    } else if (userProfileViewSteamLink) {
                         userProfileViewSteamLink.parentElement.style.display = 'none';
                     }
-                    userProfileViewRegisteredDate.textContent = formatTimestamp(profile.createdAt);
+                    if(userProfileViewRegisteredDate) userProfileViewRegisteredDate.textContent = formatTimestamp(profile.createdAt);
+                    showView('userProfile'); 
                 } else {
                     showModal("Perfil de usuário não encontrado.", "error");
                     showView('forumHome'); 
@@ -1825,28 +1971,22 @@
             } catch (error) {
                 console.error("Error loading user profile:", error);
                 showModal("Erro ao carregar perfil: " + error.message, "error");
+                showView('forumHome'); 
             }
         }
         
-        // --- Role Color & Permissions Management ---
-        async function loadRoleColorSettings() {
-            if (!db || !serverConfigDocRef || !hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) return; 
+        // --- Role Color & Server/Permissions Config ---
+        async function loadRoleColorSettings() { 
+            if (!db || !serverConfigDocRef || !hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) || !adminRoleColorSettings) return;
             adminRoleColorSettings.innerHTML = '<p class="text-gray-400">Carregando configurações de cores...</p>';
             try {
-                const docSnap = await getDoc(serverConfigDocRef);
-                let colors = {};
-                if (docSnap.exists() && docSnap.data().roleColors) {
-                    colors = docSnap.data().roleColors;
-                }
-                currentRoleColors = colors; 
-
                 let html = '';
                 defaultRoles.forEach(role => {
                     html += `
                         <div class="flex items-center space-x-2 mb-2">
                             <label for="role-color-${role}" class="w-24">${role}:</label>
-                            <input type="color" id="role-color-${role}" value="${colors[role] || '#6b7280'}" class="h-8 w-12 p-0 border-none rounded">
-                            <input type="text" id="role-hex-${role}" value="${colors[role] || '#6b7280'}" placeholder="#RRGGBB" class="p-1 bg-gray-600 border border-gray-500 rounded-md text-gray-100 w-24">
+                            <input type="color" id="role-color-${role}" value="${currentRoleColors[role] || '#6b7280'}" class="h-8 w-12 p-0 border-none rounded">
+                            <input type="text" id="role-hex-${role}" value="${currentRoleColors[role] || '#6b7280'}" placeholder="#RRGGBB" class="p-1 bg-gray-600 border border-gray-500 rounded-md text-gray-100 w-24">
                         </div>
                     `;
                 });
@@ -1865,8 +2005,8 @@
                     }
                 });
 
-            } catch (error) {
-                console.error("Error loading role color settings:", error);
+            } catch (error) { 
+                console.error("Error displaying role color settings (should be from live config):", error);
                 adminRoleColorSettings.innerHTML = '<p class="text-red-400">Erro ao carregar cores.</p>';
             }
         }
@@ -1891,7 +2031,6 @@
 
             try {
                 await setDoc(serverConfigDocRef, { roleColors: newRoleColors }, { merge: true });
-                currentRoleColors = newRoleColors; 
                 showModal("Cores dos cargos salvas com sucesso!", "success");
             } catch (error) {
                 console.error("Error saving role colors:", error);
@@ -1900,28 +2039,74 @@
         }
         
         async function loadServerConfig() { 
-            if (!db || !serverConfigDocRef) return;
-            if (unsubscribeServerConfig) unsubscribeServerConfig();
-            unsubscribeServerConfig = onSnapshot(serverConfigDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const configData = docSnap.data();
-                    if (configData.roleColors) {
-                        currentRoleColors = configData.roleColors;
-                    }
-                    registrationsOpen = configData.registrationsOpen === undefined ? true : configData.registrationsOpen;
-
-                    if (configData.rolePermissions) {
-                        serverRolePermissionsConfig = configData.rolePermissions;
-                        if (userProfileData && userProfileData.role) {
-                            currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
+            return new Promise((resolve, reject) => {
+                if (!db || !serverConfigDocRef) {
+                    console.warn("loadServerConfig: DB or serverConfigDocRef not available. Using hardcoded defaults.");
+                    currentRoleColors = { Admin: "#FF0000", Moderador: "#00FF00", VIP: "#0000FF", Membro: "#808080" };
+                    registrationsOpen = true;
+                    serverRolePermissionsConfig = { Admin: Object.fromEntries(Object.values(PERMISSIONS).map(p => [p, true])) };
+                     defaultRoles.forEach(role => { // Ensure all default roles have at least an empty perm object
+                        if (!serverRolePermissionsConfig[role]) serverRolePermissionsConfig[role] = {};
+                        if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) {
+                             serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
+                             serverRolePermissionsConfig[role][PERMISSIONS.CREATE_POST] = true;
+                             serverRolePermissionsConfig[role][PERMISSIONS.EDIT_OWN_POST] = true;
+                             serverRolePermissionsConfig[role][PERMISSIONS.DELETE_OWN_POST] = true;
+                             serverRolePermissionsConfig[role][PERMISSIONS.DELETE_OWN_TOPIC] = true;
                         }
+                    });
+                    if (userProfileData && userProfileData.role) {
+                        currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
+                    } else {
+                        currentRolePermissions = {};
+                    }
+                    resolve();
+                    return;
+                }
+
+                if (unsubscribeServerConfig) unsubscribeServerConfig();
+                let initialLoadDone = false;
+
+                unsubscribeServerConfig = onSnapshot(serverConfigDocRef, (docSnap) => {
+                    let configData = {};
+                    if (docSnap.exists()) {
+                        configData = docSnap.data();
                     } else { 
-                        serverRolePermissionsConfig = {};
+                        console.log("Server config not found in Firestore, using defaults and attempting to create.");
+                        configData = {
+                            forumName: "Negativa Server - Fórum",
+                            registrationsOpen: true,
+                            roleColors: { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" }, // Adjusted default colors
+                            rolePermissions: {}, 
+                            csServers: []
+                        };
                         defaultRoles.forEach(role => {
+                            configData.rolePermissions[role] = {};
+                            if (role === 'Admin') {
+                                Object.values(PERMISSIONS).forEach(perm => configData.rolePermissions[role][perm] = true);
+                            } else if (role === 'Membro') {
+                                configData.rolePermissions[role][PERMISSIONS.CREATE_TOPIC] = true;
+                                configData.rolePermissions[role][PERMISSIONS.CREATE_POST] = true;
+                                configData.rolePermissions[role][PERMISSIONS.EDIT_OWN_POST] = true;
+                                configData.rolePermissions[role][PERMISSIONS.DELETE_OWN_POST] = true;
+                                configData.rolePermissions[role][PERMISSIONS.DELETE_OWN_TOPIC] = true;
+                            }
+                        });
+                        setDoc(serverConfigDocRef, configData)
+                            .then(() => console.log("Default server config saved to Firestore."))
+                            .catch(err => console.error("Error saving default server config:", err));
+                    }
+
+                    currentRoleColors = configData.roleColors || { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" };
+                    registrationsOpen = configData.registrationsOpen === undefined ? true : configData.registrationsOpen;
+                    serverRolePermissionsConfig = configData.rolePermissions || {};
+                    
+                    if (Object.keys(serverRolePermissionsConfig).length === 0) {
+                         defaultRoles.forEach(role => {
                             serverRolePermissionsConfig[role] = {};
-                            if (role === 'Admin') { 
+                            if (role === 'Admin') {
                                 Object.values(PERMISSIONS).forEach(perm => serverRolePermissionsConfig[role][perm] = true);
-                            } else if (role === 'Membro') { 
+                            } else if (role === 'Membro') {
                                 serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
                                 serverRolePermissionsConfig[role][PERMISSIONS.CREATE_POST] = true;
                                 serverRolePermissionsConfig[role][PERMISSIONS.EDIT_OWN_POST] = true;
@@ -1929,62 +2114,65 @@
                                 serverRolePermissionsConfig[role][PERMISSIONS.DELETE_OWN_TOPIC] = true;
                             }
                         });
-                        if (isAdmin && adminPermissionsSettings) loadRolePermissionsSettings();
                     }
 
-                    if (configData.forumName) {
-                        forumTitleHeader.textContent = configData.forumName; 
-                        forumTitleTag.textContent = configData.forumName;
-                    } else {
-                        forumTitleHeader.textContent = "Negativa Server - Fórum";
-                        forumTitleTag.textContent = "Negativa Server - Fórum";
+
+                    if (userProfileData && userProfileData.role) {
+                        currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
                     }
-                    if (configData.csServers) {
-                        loadPublicCsServerBanners(configData.csServers);
-                    } else {
-                        serverInfoBannerContainer.innerHTML = '';
+
+                    if (forumTitleHeader) forumTitleHeader.textContent = configData.forumName || "Negativa Server - Fórum";
+                    if (forumTitleTag) forumTitleTag.textContent = configData.forumName || "Negativa Server - Fórum";
+                    loadPublicCsServerBanners(configData.csServers || []); 
+
+                    if (registerNav) registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
+                    if (adminRegistrationsToggle && isAdmin) adminRegistrationsToggle.checked = registrationsOpen; 
+
+                    if (isAdmin && adminControls && adminControls.style.display === 'block') {
+                        loadRolePermissionsSettings(); 
+                        loadRoleColorSettings(); 
                     }
-                } else { 
-                    currentRoleColors = {}; 
-                    registrationsOpen = true; 
-                    serverRolePermissionsConfig = {};
+                    console.log("[Client] Server config loaded/updated via listener. Reg Open:", registrationsOpen);
+
+                    if (!initialLoadDone) {
+                        initialLoadDone = true;
+                        resolve();
+                    }
+                }, (error) => {
+                    console.error("Error loading server config:", error);
+                    currentRoleColors = { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" };
+                    registrationsOpen = true;
+                    serverRolePermissionsConfig = { Admin: Object.fromEntries(Object.values(PERMISSIONS).map(p => [p, true])) };
                      defaultRoles.forEach(role => {
-                        serverRolePermissionsConfig[role] = {};
-                        if (role === 'Admin') {
-                            Object.values(PERMISSIONS).forEach(perm => serverRolePermissionsConfig[role][perm] = true);
-                        } else if (role === 'Membro') {
-                            serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
-                            serverRolePermissionsConfig[role][PERMISSIONS.CREATE_POST] = true;
-                            serverRolePermissionsConfig[role][PERMISSIONS.EDIT_OWN_POST] = true;
-                            serverRolePermissionsConfig[role][PERMISSIONS.DELETE_OWN_POST] = true;
-                            serverRolePermissionsConfig[role][PERMISSIONS.DELETE_OWN_TOPIC] = true;
-                        }
+                        if (!serverRolePermissionsConfig[role]) serverRolePermissionsConfig[role] = {};
+                         if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) {
+                             serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
+                             // ... other member perms
+                         }
                     });
-                    currentRolePermissions = {};
-                    forumTitleHeader.textContent = "Negativa Server - Fórum";
-                    forumTitleTag.textContent = "Negativa Server - Fórum";
-                    serverInfoBannerContainer.innerHTML = '';
-                    if (isAdmin && adminPermissionsSettings) loadRolePermissionsSettings(); 
-                }
-                registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
-                if(adminRegistrationsToggle && isAdmin) adminRegistrationsToggle.checked = registrationsOpen;
-
-                console.log("[Client] Server config loaded/updated. Registrations Open:", registrationsOpen, "Current user role:", userProfileData?.role, "Permissions:", currentRolePermissions);
-            }, (error) => {
-                console.error("Error loading server config:", error);
+                    if (userProfileData && userProfileData.role) {
+                        currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
+                    }
+                    if (!initialLoadDone) {
+                        initialLoadDone = true;
+                        reject(error); 
+                    }
+                });
             });
         }
         
         async function loadRecentMembers() {
-            if (!db || !userProfilesCol) {
-                recentMembersList.innerHTML = '<p class="text-xs text-gray-500">Não foi possível carregar membros recentes.</p>';
+            if (!db || !userProfilesCol || !recentMembersList) {
+                if(recentMembersList) recentMembersList.innerHTML = '<p class="text-xs text-gray-500">Não foi possível carregar.</p>';
                 return;
             }
             if (unsubscribeRecentMembers) unsubscribeRecentMembers();
 
             const q = query(userProfilesCol, orderBy("lastSeen", "desc"), limit(5));
             unsubscribeRecentMembers = onSnapshot(q, (snapshot) => {
-                if (!currentUser) return; 
+                if (!currentUser && !registrationsOpen) { 
+                     recentMembersList.innerHTML = ''; return;
+                }
                 if (snapshot.empty) {
                     recentMembersList.innerHTML = '<p class="text-xs text-gray-500">Nenhum membro online recentemente.</p>';
                     return;
@@ -1992,7 +2180,7 @@
                 let membersHtml = '<h4 class="text-md font-semibold text-gray-300 mb-2">Online Recentemente:</h4><ul class="space-y-1">';
                 snapshot.forEach(doc => {
                     const member = doc.data();
-                    const displayName = member.nickname || member.displayName || member.email.split('@')[0];
+                    const displayName = member.nickname || member.displayName || member.email?.split('@')[0] || 'Usuário';
                     const roleColor = currentRoleColors[member.role] || '#6b7280';
                     membersHtml += `
                         <li class="text-xs">
@@ -2006,13 +2194,13 @@
                 addProfileLinkListeners(recentMembersList);
             }, (error) => {
                 console.error("Error loading recent members:", error);
-                if(currentUser) recentMembersList.innerHTML = '<p class="text-xs text-red-500">Erro ao carregar membros recentes.</p>';
+                if(recentMembersList) recentMembersList.innerHTML = '<p class="text-xs text-red-500">Erro ao carregar membros.</p>';
             });
         }
 
         // --- Chat Functionality ---
         async function sendChatMessage() {
-            if (!currentUser || !db || !chatMessagesCol) {
+            if (!currentUser || !db || !chatMessagesCol || !chatMessageInput) {
                 showModal("Você precisa estar logado para enviar mensagens no chat.", "error");
                 return;
             }
@@ -2038,7 +2226,7 @@
         }
 
         async function loadChatMessages() {
-            if (!db || !chatMessagesCol) {
+            if (!db || !chatMessagesCol || !chatMessagesContainer) {
                 if (chatMessagesContainer) chatMessagesContainer.innerHTML = '<p class="text-xs text-gray-500">Chat indisponível.</p>';
                 return;
             }
@@ -2046,8 +2234,9 @@
 
             const q = query(chatMessagesCol, orderBy("timestamp", "desc"), limit(30));
             unsubscribeChatMessages = onSnapshot(q, async (snapshot) => {
-                if (!currentUser) return; 
-                if (!chatMessagesContainer) return;
+                 if (!currentUser && !registrationsOpen) { 
+                     chatMessagesContainer.innerHTML = ''; return;
+                 }
 
                 const messages = [];
                 snapshot.forEach(doc => messages.push({ id: doc.id, ...doc.data() }));
@@ -2061,16 +2250,17 @@
                         const roleColor = currentRoleColors[msg.role] || '#6b7280';
                         const messageDiv = document.createElement('div');
                         messageDiv.className = 'chat-message text-xs';
-                        
+
                         let deleteButtonHtml = '';
-                        if (hasPermission(PERMISSIONS.MODERATE_CHAT)) {
+                        if (hasPermission(PERMISSIONS.MODERATE_CHAT) || (currentUser && msg.userId === currentUser.uid)) { 
                             deleteButtonHtml = `<button class="delete-chat-msg-btn" data-msg-id="${msg.id}" title="Apagar mensagem">X</button>`;
                         }
+                        const sanitizedText = msg.text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
                         messageDiv.innerHTML = `
                             <div>
                                 <span class="username user-profile-link cursor-pointer hover:underline" data-userid="${msg.userId}" style="color: ${roleColor};">${msg.displayName}</span>:
-                                <span>${msg.text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>
+                                <span>${sanitizedText}</span>
                             </div>
                             ${deleteButtonHtml}
                         `;
@@ -2080,7 +2270,12 @@
                     chatMessagesContainer.querySelectorAll('.delete-chat-msg-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             const msgId = e.target.dataset.msgId;
-                            confirmAction("Tem certeza que deseja apagar esta mensagem do chat?", () => deleteChatMessage(msgId));
+                            const messageToDelete = messages.find(m => m.id === msgId);
+                            if (hasPermission(PERMISSIONS.MODERATE_CHAT) && messageToDelete && messageToDelete.userId !== currentUserId) {
+                                confirmAction("Tem certeza que deseja apagar esta mensagem do chat?", () => deleteChatMessage(msgId));
+                            } else if (messageToDelete && messageToDelete.userId === currentUserId) { 
+                                deleteChatMessage(msgId);
+                            }
                         });
                     });
                     chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight; 
@@ -2089,8 +2284,8 @@
                 if (snapshot.docs.length >= 30) { 
                     const allMessagesQuery = query(chatMessagesCol, orderBy("timestamp", "asc")); 
                     const allMessagesSnap = await getDocs(allMessagesQuery);
-                    if (allMessagesSnap.docs.length > 30) {
-                        const messagesToDelete = allMessagesSnap.docs.slice(0, allMessagesSnap.docs.length - 30);
+                    if (allMessagesSnap.docs.length > 50) { 
+                        const messagesToDelete = allMessagesSnap.docs.slice(0, allMessagesSnap.docs.length - 30); 
                         for (const docToDelete of messagesToDelete) {
                             try {
                                 await deleteDoc(doc(chatMessagesCol, docToDelete.id));
@@ -2101,30 +2296,23 @@
                     }
                 }
 
-
             }, (error) => {
                 console.error("Error loading chat messages:", error);
-                if(currentUser && chatMessagesContainer) chatMessagesContainer.innerHTML = '<p class="text-xs text-red-500">Erro ao carregar chat.</p>';
+                if(chatMessagesContainer) chatMessagesContainer.innerHTML = '<p class="text-xs text-red-500">Erro ao carregar chat.</p>';
             });
         }
         
         async function deleteChatMessage(messageId) {
-            if (!hasPermission(PERMISSIONS.MODERATE_CHAT)) {
-                showModal("Você não tem permissão para apagar mensagens do chat.", "error");
-                return;
-            }
             try {
                 await deleteDoc(doc(chatMessagesCol, messageId));
-                showModal("Mensagem do chat apagada.", "success");
             } catch (error) {
                 console.error("Error deleting chat message:", error);
                 showModal("Erro ao apagar mensagem do chat: " + error.message, "error");
             }
         }
         
-        // --- Role Permissions Management (Admin) ---
-        function loadRolePermissionsSettings() {
-            if (!db || !serverConfigDocRef || !hasPermission(PERMISSIONS.MANAGE_ROLES_PERMISSIONS)) {
+        function loadRolePermissionsSettings() { 
+            if (!db || !serverConfigDocRef || !hasPermission(PERMISSIONS.MANAGE_ROLES_PERMISSIONS) || !adminPermissionsSettings) {
                 if(adminPermissionsSettings) adminPermissionsSettings.innerHTML = ''; 
                 return;
             }
@@ -2155,27 +2343,17 @@
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">`;
                 Object.keys(PERMISSIONS).forEach(permKey => {
                     const permValue = PERMISSIONS[permKey];
-                    if (permValue === PERMISSIONS.MANAGE_ROLES_PERMISSIONS && role !== 'Admin') { 
-                         const isChecked = serverRolePermissionsConfig[role] && serverRolePermissionsConfig[role][permValue];
-                         html += `
-                            <label class="flex items-center space-x-2 text-sm">
-                                <input type="checkbox" id="perm-${role}-${permValue}" data-role="${role}" data-permission="${permValue}" 
-                                    class="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-400" 
-                                    ${isChecked ? 'checked' : ''}>
-                                <span>${permissionLabels[permValue] || permValue}</span>
-                            </label>
-                        `;
-                    } else if (permValue !== PERMISSIONS.MANAGE_ROLES_PERMISSIONS) { 
-                        const isChecked = serverRolePermissionsConfig[role] && serverRolePermissionsConfig[role][permValue];
-                        html += `
-                            <label class="flex items-center space-x-2 text-sm">
-                                <input type="checkbox" id="perm-${role}-${permValue}" data-role="${role}" data-permission="${permValue}" 
-                                    class="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-400" 
-                                    ${isChecked ? 'checked' : ''}>
-                                <span>${permissionLabels[permValue] || permValue}</span>
-                            </label>
-                        `;
-                    }
+                    if (permValue === PERMISSIONS.MANAGE_ROLES_PERMISSIONS && role === 'Admin') return;
+
+                    const isChecked = serverRolePermissionsConfig[role] && serverRolePermissionsConfig[role][permValue];
+                    html += `
+                        <label class="flex items-center space-x-2 text-sm">
+                            <input type="checkbox" id="perm-${role}-${permValue}" data-role="${role}" data-permission="${permValue}" 
+                                class="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-400" 
+                                ${isChecked ? 'checked' : ''}>
+                            <span>${permissionLabels[permValue] || permValue}</span>
+                        </label>
+                    `;
                 });
                 html += `</div></div>`;
             });
@@ -2188,32 +2366,29 @@
                 showModal("Você não tem permissão para gerenciar permissões.", "error"); return;
             }
 
-            const newPermissions = {};
+            const newPermissionsConfig = JSON.parse(JSON.stringify(serverRolePermissionsConfig)); 
+
             defaultRoles.forEach(role => {
-                newPermissions[role] = {}; 
                 if (role === 'Admin') { 
+                    newPermissionsConfig[role] = {};
                     Object.values(PERMISSIONS).forEach(permValue => {
-                        newPermissions[role][permValue] = true;
+                        newPermissionsConfig[role][permValue] = true;
                     });
                     return; 
                 }
                 
+                if (!newPermissionsConfig[role]) newPermissionsConfig[role] = {}; 
+                
                 Object.values(PERMISSIONS).forEach(permValue => {
                     const checkbox = document.getElementById(`perm-${role}-${permValue}`);
                     if (checkbox) { 
-                        newPermissions[role][permValue] = checkbox.checked;
-                    } else if (permValue === PERMISSIONS.MANAGE_ROLES_PERMISSIONS && role !== 'Admin') {
-                        newPermissions[role][permValue] = false; 
-                    }
+                        newPermissionsConfig[role][permValue] = checkbox.checked;
+                    } 
                 });
             });
 
             try {
-                await setDoc(serverConfigDocRef, { rolePermissions: newPermissions }, { merge: true });
-                serverRolePermissionsConfig = newPermissions; 
-                if (userProfileData && userProfileData.role) {
-                    currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
-                }
+                await setDoc(serverConfigDocRef, { rolePermissions: newPermissionsConfig }, { merge: true });
                 showModal("Permissões dos cargos salvas com sucesso!", "success");
             } catch (error) {
                 console.error("Error saving role permissions:", error);
@@ -2227,7 +2402,14 @@
         const messageModalText = document.getElementById('message-modal-text');
         const messageModalClose = document.getElementById('message-modal-close');
 
-        function showModal(message, type = "error") { 
+        function showModal(message, type = "info") { 
+            if (!messageModal || !messageModalText) {
+                console.warn("Message modal elements not found. Message:", message);
+                if (type === "error") console.error(message);
+                else if (type === "success") console.log("SUCCESS:", message);
+                else console.info(message);
+                return;
+            }
             messageModalText.textContent = message;
             messageModalText.className = 'mb-4 '; 
             if (type === "error") messageModalText.classList.add('text-red-700');
@@ -2235,13 +2417,19 @@
             else messageModalText.classList.add('text-blue-700'); 
             messageModal.style.display = 'flex';
         }
-        messageModalClose.onclick = () => messageModal.style.display = 'none';
-        window.onclick = (event) => {
+        if (messageModalClose) messageModalClose.onclick = () => messageModal.style.display = 'none';
+        
+        window.onclick = (event) => { 
             if (event.target == messageModal) messageModal.style.display = 'none';
-            if (event.target == document.getElementById('create-topic-modal')) document.getElementById('create-topic-modal').style.display = 'none';
-            if (event.target == document.getElementById('confirm-action-modal')) document.getElementById('confirm-action-modal').style.display = 'none';
-            if (event.target == csServerModal) csServerModal.style.display = 'none';
-            if (event.target == editPostModal) editPostModal.style.display = 'none';
+            
+            const createTopicModalElem = document.getElementById('create-topic-modal');
+            if (createTopicModalElem && event.target == createTopicModalElem) createTopicModalElem.style.display = 'none';
+            
+            const confirmActionModalElem = document.getElementById('confirm-action-modal');
+            if (confirmActionModalElem && event.target == confirmActionModalElem) confirmActionModalElem.style.display = 'none';
+            
+            if (csServerModal && event.target == csServerModal) csServerModal.style.display = 'none';
+            if (editPostModal && event.target == editPostModal) editPostModal.style.display = 'none';
         }
 
         const confirmModal = document.getElementById('confirm-action-modal');
@@ -2251,25 +2439,24 @@
         let confirmCallback = null;
 
         function confirmAction(message, callback) {
+            if (!confirmModal || !confirmModalText) {
+                console.warn("Confirm modal elements not found. Action:", message);
+                console.error("Confirmation modal not available for: " + message + ". Action NOT performed.");
+                return;
+            }
             confirmModalText.textContent = message;
             confirmCallback = callback;
             confirmModal.style.display = 'flex';
         }
-        confirmModalYes.onclick = () => {
+        if (confirmModalYes) confirmModalYes.onclick = () => {
             if (confirmCallback) confirmCallback();
             confirmModal.style.display = 'none';
             confirmCallback = null;
         };
-        confirmModalNo.onclick = () => {
+        if (confirmModalNo) confirmModalNo.onclick = () => {
             confirmModal.style.display = 'none';
             confirmCallback = null;
         };
-
-        if (auth) {
-            initAuth();
-        } else {
-            showView('login'); 
-        }
 
     </script>
 
@@ -2281,7 +2468,7 @@
                 <span id="current-user-id-display" class="text-xs text-gray-400" style="display:none;"></span>
                 <a href="#" id="my-profile-nav" class="text-blue-400 hover:text-blue-300" style="display:none;">Meu Perfil</a>
                 <a href="#" id="login-nav" class="text-blue-400 hover:text-blue-300">Login</a>
-                <a href="#" id="register-nav" class="text-blue-400 hover:text-blue-300">Registrar</a>
+                <a href="#" id="register-nav" class="text-blue-400 hover:text-blue-300" style="display:none;">Registrar</a>
                 <a href="#" id="logout-nav" class="text-blue-400 hover:text-blue-300" style="display:none;">Logout</a>
             </nav>
         </div>
@@ -2291,7 +2478,7 @@
     </header>
 
     <div id="server-info-banner-container" class="container mx-auto mt-4 space-y-2">
-        </div>
+    </div>
 
 
     <main id="main-content" class="container mx-auto p-4">
@@ -2335,83 +2522,85 @@
             </form>
             <p class="text-center mt-4 text-sm">Já tem uma conta? <a href="#" id="show-login-view" class="text-blue-400 hover:underline">Faça Login</a></p>
         </div>
-        
+
         <div id="forum-home-view" class="view">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div class="md:col-span-3">
                     <div id="admin-controls" style="display:none;" class="mb-6 bg-gray-800 p-6 rounded-lg shadow-md">
-                        <h3 class="text-xl font-semibold mb-4 text-yellow-400">Painel do Administrador</h3>
-                        <p class="text-sm text-gray-400 mb-4">
-                    
-                        </p>
+                        <h3 class="text-2xl font-bold mb-6 text-yellow-500 border-b border-gray-700 pb-3">Painel do Administrador</h3>
                         
-                        <div class="mb-6 border-b border-gray-700 pb-4">
-                            <h4 class="text-lg font-semibold mb-2 text-yellow-300">Configurações Gerais do Fórum</h4>
-                            <div class="mb-3">
-                                <label for="admin-forum-name" class="block text-sm font-medium text-gray-300 mb-1">Nome do Fórum</label>
-                                <input type="text" id="admin-forum-name" class="w-full p-2 bg-gray-600 border border-gray-500 rounded-md text-gray-100 placeholder-gray-400">
+                        <div class="admin-section">
+                            <h4 class="admin-section-title">Configurações Gerais do Fórum</h4>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="admin-forum-name" class="block text-sm font-medium text-gray-300 mb-1">Nome do Fórum</label>
+                                    <input type="text" id="admin-forum-name" class="w-full p-2 bg-gray-600 border border-gray-500 rounded-md text-gray-100 placeholder-gray-400">
+                                </div>
+                                 <div class="flex items-center">
+                                    <label for="admin-registrations-toggle" class="block text-sm font-medium text-gray-300 mr-3">Permitir Novos Cadastros:</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="admin-registrations-toggle">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="flex space-x-3">
+                                    <button id="save-forum-name-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Nome</button>
+                                    <button id="save-registration-settings-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Config. Cadastro</button>
+                                </div>
                             </div>
-                             <div class="mb-3 flex items-center">
-                                <label for="admin-registrations-toggle" class="block text-sm font-medium text-gray-300 mr-3">Permitir Novos Cadastros:</label>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="admin-registrations-toggle">
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <button id="save-forum-name-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150 mr-2">Salvar Nome</button>
-                            <button id="save-registration-settings-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Config. Cadastro</button>
                         </div>
 
-                        <form id="create-category-form" class="space-y-4 mb-6 border-b border-gray-700 pb-4">
-                            <h4 class="text-lg font-semibold mb-2 text-yellow-300">Criar Nova Categoria</h4>
-                            <div>
-                                <label for="category-name" class="block text-sm font-medium text-gray-300 mb-1">Nome da Categoria</label>
-                                <input type="text" id="category-name" name="name" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400">
-                            </div>
-                            <div class="mb-2">
-                                <label for="category-description" class="block text-sm font-medium text-gray-300 mb-1">Descrição</label>
-                                <textarea id="category-description" name="description" rows="2" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400"></textarea>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-2 px-4 rounded-md transition duration-150">Criar Categoria</button>
-                                <button type="button" id="generate-category-description-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-md transition duration-150 text-sm">
-                                    Gerar Descrição com IA ✨
-                                </button>
-                                <div id="generate-category-desc-spinner" class="gemini-loading-spinner" style="display:none;"></div>
-                            </div>
-                        </form>
-
-                        <div class="mb-6 border-b border-gray-700 pb-4">
-                            <h4 class="text-lg font-semibold mb-2 text-yellow-300">Configurar Servidores CS2</h4>
-                            <div id="cs-servers-list-admin" class="space-y-2 mb-3">
+                        <div class="admin-section">
+                            <h4 class="admin-section-title">Criar Nova Categoria</h4>
+                            <form id="create-category-form" class="space-y-4">
+                                <div>
+                                    <label for="category-name" class="block text-sm font-medium text-gray-300 mb-1">Nome da Categoria</label>
+                                    <input type="text" id="category-name" name="name" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400">
                                 </div>
+                                <div class="mb-2">
+                                    <label for="category-description" class="block text-sm font-medium text-gray-300 mb-1">Descrição</label>
+                                    <textarea id="category-description" name="description" rows="2" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400"></textarea>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-2 px-4 rounded-md transition duration-150">Criar Categoria</button>
+                                    <button type="button" id="generate-category-description-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-md transition duration-150 text-sm">
+                                        Gerar Descrição com IA ✨
+                                    </button>
+                                    <div id="generate-category-desc-spinner" class="gemini-loading-spinner" style="display:none;"></div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="admin-section">
+                            <h4 class="admin-section-title">Configurar Servidores CS2</h4>
+                            <div id="cs-servers-list-admin" class="space-y-2 mb-3">
+                            </div>
                             <button id="add-cs-server-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Adicionar Servidor CS2</button>
                         </div>
 
-                        <div class="mb-6 border-b border-gray-700 pb-4">
-                            <h4 class="text-lg font-semibold mb-2 text-yellow-300">Configurações de Cores dos Cargos</h4>
+                        <div class="admin-section">
+                            <h4 class="admin-section-title">Configurações de Cores dos Cargos</h4>
                             <div id="admin-role-color-settings" class="space-y-2">
-                                </div>
+                            </div>
                             <button id="save-role-colors-btn" class="mt-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Cores dos Cargos</button>
                         </div>
                         
-                        <div class="mb-6 border-b border-gray-700 pb-4">
-                            <h4 class="text-lg font-semibold mb-2 text-yellow-300">Permissões dos Cargos</h4>
+                        <div class="admin-section">
+                            <h4 class="admin-section-title">Permissões dos Cargos</h4>
                             <div id="admin-permissions-settings" class="space-y-4">
-                                </div>
+                            </div>
                             <button id="save-permissions-btn" class="mt-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Permissões</button>
                         </div>
 
-
-                        <div>
-                            <h4 class="text-lg font-semibold mb-2 text-yellow-300">Gerenciamento de Usuários</h4>
+                        <div class="admin-section">
+                            <h4 class="admin-section-title">Gerenciamento de Usuários</h4>
                             <div id="admin-user-list" class="space-y-3 max-h-96 overflow-y-auto">
-                                </div>
+                            </div>
                         </div>
                     </div>
                     <h2 class="text-2xl font-semibold mb-6 text-blue-400">Categorias</h2>
                     <div id="categories-list" class="space-y-4">
-                        </div>
+                    </div>
                 </div>
                 <aside class="md:col-span-1 bg-gray-800 p-4 rounded-lg shadow-md">
                     <div id="recent-members-list">
@@ -2420,7 +2609,7 @@
                     <div class="mt-6 pt-4 border-t border-gray-700">
                         <h4 class="text-md font-semibold text-gray-300 mb-2">Chat Rápido</h4>
                         <div id="chat-messages" class="bg-gray-700 p-2 rounded h-48 overflow-y-auto text-xs mb-2">
-                            </div>
+                        </div>
                         <div class="flex">
                             <input type="text" id="chat-message-input" class="flex-grow p-2 bg-gray-600 border border-gray-500 rounded-l-md text-gray-100 placeholder-gray-400 text-sm" placeholder="Digite sua mensagem...">
                             <button id="send-chat-message-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-r-md text-sm">Enviar</button>
@@ -2436,15 +2625,15 @@
                 <button id="show-create-topic-modal" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Novo Tópico</button>
             </div>
             <div id="topics-list" class="space-y-3">
-                </div>
+            </div>
         </div>
 
         <div id="topic-view" class="view">
             <h2 id="topic-title-full" class="text-2xl font-semibold mb-6 text-blue-400"></h2>
             <div id="topic-poll-container" class="mb-6">
-                </div>
+            </div>
             <div id="posts-list" class="mb-6">
-                </div>
+            </div>
             <form id="create-post-form" class="bg-gray-800 p-6 rounded-lg shadow-md">
                 <h3 class="text-xl font-semibold mb-4 text-gray-200">Responder ao Tópico</h3>
                 <div>
@@ -2495,16 +2684,17 @@
     </footer>
 
     <div id="message-modal" class="modal" style="display:none;">
-        <div class="modal-content bg-gray-100 text-gray-800 rounded-lg shadow-xl"> <span id="message-modal-close" class="modal-close">&times;</span>
+        <div class="modal-content bg-gray-100 text-gray-800 rounded-lg shadow-xl">
+            <span id="message-modal-close" class="modal-close">&times;</span>
             <p id="message-modal-text" class="mb-4"></p>
             <button onclick="document.getElementById('message-modal').style.display='none'" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded w-full">OK</button>
         </div>
     </div>
 
     <div id="create-topic-modal" class="modal" style="display:none;">
-        <div class="modal-content bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full modal-content-lg"> 
+        <div class="modal-content modal-content-lg bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full">
             <h3 class="text-xl font-semibold mb-4 text-blue-400">Criar Novo Tópico</h3>
-            <form id="create-topic-form-modal"> 
+            <form id="create-topic-form-modal">
                 <div class="mb-4">
                     <label for="new-topic-title" class="block text-sm font-medium text-gray-300 mb-1">Título do Tópico</label>
                     <input type="text" id="new-topic-title" name="title" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400">
@@ -2517,7 +2707,7 @@
                     <label for="new-topic-command" class="block text-sm font-medium text-gray-300 mb-1">Comando para Copiar (Opcional)</label>
                     <input type="text" id="new-topic-command" name="commandToCopy" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400" placeholder="Ex: connect seu.ip.aqui:porta">
                 </div>
-                
+
                 <div class="flex justify-end space-x-3 items-center">
                     <button type="button" id="suggest-topic-title-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-md transition duration-150 text-sm">
                         Sugerir Título com IA ✨
@@ -2529,9 +2719,10 @@
             </form>
         </div>
     </div>
-    
+
     <div id="confirm-action-modal" class="modal" style="display:none;">
-        <div class="modal-content bg-gray-100 text-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md"> <h3 class="text-lg font-semibold mb-4 text-yellow-500">Confirmar Ação</h3>
+        <div class="modal-content bg-gray-100 text-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-4 text-yellow-500">Confirmar Ação</h3>
             <p id="confirm-action-text" class="mb-6 text-gray-700"></p>
             <div class="flex justify-end space-x-3">
                 <button id="confirm-action-no" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Não</button>
@@ -2544,7 +2735,8 @@
         <div class="modal-content bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-semibold mb-4 text-blue-400">Configurar Servidor CS2</h3>
             <form id="cs-server-form">
-                <input type="hidden" id="cs-server-id"> <div class="mb-4">
+                <input type="hidden" id="cs-server-id">
+                <div class="mb-4">
                     <label for="cs-server-name" class="block text-sm font-medium text-gray-300 mb-1">Nome de Exibição do Servidor</label>
                     <input type="text" id="cs-server-name" required class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400">
                 </div>
@@ -2570,7 +2762,6 @@
             </div>
         </div>
     </div>
-
 
 </body>
 </html>
