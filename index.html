@@ -569,7 +569,7 @@
                     unsubscribeCurrentUserProfile = onSnapshot(userProfileRef, async (profileSnap) => {
                         if (!currentUser) return; 
 
-                        let initialProfileLoad = !userProfileData; // Check if this is the first time profile data is loaded for this session
+                        let initialProfileLoad = !userProfileData; 
 
                         if (profileSnap.exists()) {
                             const updatedProfileData = profileSnap.data();
@@ -579,10 +579,9 @@
                             
                             console.log("[Profile Listener] Profile data updated:", userProfileData);
 
-                            // Update currentRolePermissions based on the potentially new role and live server config
                             if (userProfileData.role && serverRolePermissionsConfig[userProfileData.role]) {
                                 currentRolePermissions = serverRolePermissionsConfig[userProfileData.role];
-                            } else { // Fallback if role is not in config or no role
+                            } else { 
                                 currentRolePermissions = {};
                                 if (userProfileData.role) console.warn(`Role "${userProfileData.role}" not found in serverRolePermissionsConfig.`);
                             }
@@ -596,7 +595,6 @@
                             if (views.myProfile && views.myProfile.classList.contains('active-view')) {
                                 loadMyProfileView(); 
                             }
-                             // If it's the initial load of the profile OR role changed, refresh dependent UI
                             if (initialProfileLoad || (oldRole && oldRole !== userProfileData.role)) {
                                 console.log(`[Profile Listener] Initial profile load (${initialProfileLoad}) or role change (from ${oldRole} to ${userProfileData.role}). Refreshing UI components.`);
                                 if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
@@ -625,9 +623,8 @@
                                 };
                                 await setDoc(userProfileRef, userProfileData);
                                 console.log("[Auth/Profile Listener] New user profile created:", JSON.stringify(userProfileData));
-                                isAdmin = (userProfileData.role === 'Admin'); // Set isAdmin after creation
-                                // The listener will fire again with the new data, triggering UI updates.
-                                initialProfileLoad = true; // Treat as initial load for subsequent logic
+                                isAdmin = (userProfileData.role === 'Admin'); 
+                                initialProfileLoad = true; 
                             } catch (error) {
                                 console.error("[Auth/Profile Listener] Error creating user profile:", error);
                                 showModal("Erro ao criar perfil de usuário: " + error.message);
@@ -636,18 +633,16 @@
                             }
                         }
 
-                        if (initialProfileLoad && userProfileData) { // Only proceed with full load sequence on initial profile availability
+                        if (initialProfileLoad && userProfileData) { 
                             loginNav.style.display = 'none';
                             logoutNav.style.display = 'inline-block';
                             myProfileNav.style.display = 'inline-block';
                             
                             try {
-                                await loadServerConfig(); // Wait for initial server config
+                                await loadServerConfig(); 
                                 console.log("[Auth State] Server config loaded. Proceeding with other data loads.");
-                                // UI updates dependent on server config are now safe
                                 if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
                                     adminControls.style.display = 'block';
-                                    // These were potentially called above, but ensure they run with fresh serverConfig
                                     loadUsersForAdmin();
                                     loadAdminServerSettings(); 
                                     loadRoleColorSettings();
@@ -659,12 +654,12 @@
                                 loadCategories();
                                 loadRecentMembers();
                                 loadChatMessages();
-                                showView('forumHome'); // Show forum home after everything is ready
+                                showView('forumHome'); 
                             } catch (error) {
                                 console.error("Failed to load initial server config:", error);
                                 showModal("Erro crítico ao carregar configurações do servidor.", "error");
                                 registerNav.style.display = 'inline-block'; 
-                                showView('forumHome'); // Show forum home even if server config fails, with defaults
+                                showView('forumHome'); 
                             }
                         }
                     }, (error) => {
@@ -695,7 +690,7 @@
                     myProfileNav.style.display = 'none';
                     adminControls.style.display = 'none';
                     
-                    await loadServerConfig(); // Still load for registration status
+                    await loadServerConfig(); 
                     registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
 
                     if(serverInfoBannerContainer) serverInfoBannerContainer.innerHTML = ''; 
@@ -1627,7 +1622,8 @@
             if (document.getElementById('topic-poll-container')) document.getElementById('topic-poll-container').innerHTML = ''; 
 
             postsList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando postagens...</p>';
-            const q = query(postsCol, where("topicId", "==", topicId), orderBy("createdAt", "asc")); 
+            // Modified query: Removed orderBy("createdAt", "asc")
+            const q = query(postsCol, where("topicId", "==", topicId)); 
 
             if(unsubscribePosts) unsubscribePosts();
             unsubscribePosts = onSnapshot(q, async (snapshot) => {
@@ -1664,8 +1660,16 @@
                     } catch (err) { console.error("Error fetching user profiles for posts:", err); }
                 }
                 
+                // Client-side sorting
+                const docsToSort = [...snapshot.docs];
+                const sortedDocs = docsToSort.sort((a,b) => {
+                    const timeA = a.data().createdAt?.seconds || 0;
+                    const timeB = b.data().createdAt?.seconds || 0;
+                    return timeA - timeB; // Ascending order
+                });
+
                 let postsHtml = '';
-                snapshot.docs.forEach((postDoc, index) => {
+                sortedDocs.forEach((postDoc, index) => { // Iterate over sortedDocs
                     const post = postDoc.data();
                     const userProfile = profiles[post.userId];
                     const displayName = userProfile?.displayName || post.userDisplayName || 'Desconhecido';
@@ -2045,7 +2049,7 @@
                     currentRoleColors = { Admin: "#FF0000", Moderador: "#00FF00", VIP: "#0000FF", Membro: "#808080" };
                     registrationsOpen = true;
                     serverRolePermissionsConfig = { Admin: Object.fromEntries(Object.values(PERMISSIONS).map(p => [p, true])) };
-                     defaultRoles.forEach(role => { // Ensure all default roles have at least an empty perm object
+                     defaultRoles.forEach(role => { 
                         if (!serverRolePermissionsConfig[role]) serverRolePermissionsConfig[role] = {};
                         if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) {
                              serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
@@ -2076,7 +2080,7 @@
                         configData = {
                             forumName: "Negativa Server - Fórum",
                             registrationsOpen: true,
-                            roleColors: { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" }, // Adjusted default colors
+                            roleColors: { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" }, 
                             rolePermissions: {}, 
                             csServers: []
                         };
@@ -2147,7 +2151,6 @@
                         if (!serverRolePermissionsConfig[role]) serverRolePermissionsConfig[role] = {};
                          if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) {
                              serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
-                             // ... other member perms
                          }
                     });
                     if (userProfileData && userProfileData.role) {
