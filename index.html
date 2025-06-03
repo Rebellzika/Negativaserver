@@ -190,6 +190,7 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
+        // Configuration provided by the user (hardcoded as a fallback)
         const userHardcodedFirebaseConfig = {
           apiKey: "AIzaSyCFqjQc4lEj8-djp7frombN_isi_3DVnCM", 
           authDomain: "negativa-af3a2.firebaseapp.com",
@@ -201,16 +202,19 @@
         };
 
         let activeFirebaseConfig = userHardcodedFirebaseConfig;
-        let finalInitialAuthToken = undefined;
+        let finalInitialAuthToken = undefined; // Will hold the auth token to be used
 
+        // Check for Firebase config provided by the Canvas environment
         const canvasProvidedFirebaseConfigStr = (typeof __firebase_config !== 'undefined' && __firebase_config !== null && String(__firebase_config).trim() !== "" && String(__firebase_config) !== "{}")
             ? String(__firebase_config)
             : null;
 
+        // Check for initial auth token provided by the Canvas environment
         const canvasProvidedInitialAuthToken = (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null && String(__initial_auth_token).toLowerCase() !== "undefined" && String(__initial_auth_token).trim() !== "")
             ? String(__initial_auth_token)
             : undefined;
 
+        // Determine which Firebase config and auth token to use
         if (canvasProvidedFirebaseConfigStr && canvasProvidedInitialAuthToken) {
             try {
                 activeFirebaseConfig = JSON.parse(canvasProvidedFirebaseConfigStr);
@@ -219,21 +223,26 @@
             } catch (e) {
                 console.error("Error parsing Canvas-provided Firebase config. Falling back to user's hardcoded config. Custom token from Canvas will NOT be used.", e);
                 activeFirebaseConfig = userHardcodedFirebaseConfig;
-                finalInitialAuthToken = undefined;
+                finalInitialAuthToken = undefined; // Ensure no Canvas token is used with hardcoded config
             }
         } else if (canvasProvidedInitialAuthToken) {
+            // If only token is provided, it might be for a different Firebase project.
+            // It's safer to use the user's config and not the token to avoid mismatches.
             console.warn("Canvas custom token detected, but no valid Canvas Firebase config. Using user's hardcoded Firebase config. Canvas token will NOT be used to prevent mismatch.");
             activeFirebaseConfig = userHardcodedFirebaseConfig;
             finalInitialAuthToken = undefined;
         } else {
+            // No Canvas config or token, use user's hardcoded values
             console.log("Using user's hardcoded Firebase config. No Canvas custom token or config detected.");
             activeFirebaseConfig = userHardcodedFirebaseConfig;
             finalInitialAuthToken = undefined;
         }
         
+        // Determine the App ID for Firestore paths (important for multi-tenant environments)
         const firestorePathAppId = (typeof __app_id !== 'undefined' && String(__app_id).trim() !== "") ? String(__app_id) : activeFirebaseConfig.projectId;
         console.log("Using Firestore Path App ID for Firestore paths:", firestorePathAppId);
         
+        // Firebase App Initialization
         let app;
         let auth;
         let db;
@@ -242,40 +251,45 @@
             app = initializeApp(activeFirebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-            setLogLevel('debug'); 
+            setLogLevel('debug'); // Enable Firestore debug logging
             console.log("Firebase initialized successfully. Firestore debug logging enabled.");
         } catch (e) {
             console.error("CRITICAL: Firebase initialization failed:", e);
+            // Attempt to show an error message to the user if the modal exists
             const errorModal = document.getElementById('message-modal');
             const errorModalText = document.getElementById('message-modal-text');
             if (errorModal && errorModalText) {
                 errorModalText.textContent = "Falha crítica na inicialização do Firebase: " + e.message + ". O aplicativo pode não funcionar corretamente.";
-                errorModalText.className = 'mb-4 text-red-700';
+                errorModalText.className = 'mb-4 text-red-700'; // Style as error
                 errorModal.style.display = 'flex';
             } else {
+                // Fallback if modal isn't available (e.g., DOM not fully loaded)
                 console.error("Fallback Alert: Falha crítica na inicialização do Firebase: " + e.message);
             }
         }
 
+        // Global state variables
         let currentUser = null;
         let currentUserId = null;
         let isAdmin = false;
-        let userProfileData = null; 
-        let currentRolePermissions = {}; 
+        let userProfileData = null; // To store the current user's profile from Firestore
+        let currentRolePermissions = {}; // Permissions for the current user's role
 
+        // Firestore listener unsubscribers
         let unsubscribeCategories = null;
         let unsubscribeTopics = null;
         let unsubscribePosts = null;
         let unsubscribeServerConfig = null;
         let unsubscribeRecentMembers = null;
         let unsubscribeChatMessages = null;
-        let unsubscribeCurrentUserProfile = null; 
+        let unsubscribeCurrentUserProfile = null; // Listener for the current user's own profile
         
         let editingPostId = null; // For editing post content
         let editingTopicId = null; // For editing topic metadata (title, roles)
         let editingTopicData = null; // To store current topic data for the edit modal
 
 
+        // --- Permissions Constants ---
         const PERMISSIONS = {
             MANAGE_FORUM_SETTINGS: 'canManageForumSettings',
             MANAGE_USERS: 'canManageUsers',
@@ -293,12 +307,16 @@
             // Consider adding EDIT_ANY_TOPIC if more granular control is needed than MANAGE_CATEGORIES
         };
 
-        const defaultRoles = ['Admin', 'Moderador', 'VIP', 'Membro'];
-        let currentRoleColors = {}; 
-        let serverRolePermissionsConfig = {}; 
-        let registrationsOpen = true; 
+        // --- Default Roles and Server Configuration Variables ---
+        const defaultRoles = ['Admin', 'Moderador', 'VIP', 'Membro']; // Default roles in the system
+        let currentRoleColors = {}; // Loaded from serverConfig
+        let serverRolePermissionsConfig = {}; // Loaded from serverConfig, defines permissions per role
+        let registrationsOpen = true; // Loaded from serverConfig, controls new user registration
 
-        const views = {}; 
+        // --- DOM Element Variables ---
+        // Views
+        const views = {}; // Object to hold all view elements for easy switching
+        // Other UI elements
         let forumTitleHeader, forumTitleTag, userDisplay, loginNav, registerNav, logoutNav, myProfileNav, adminControls, adminPanelNav,
             categoriesList, topicsList, postsList, categoryTitle, topicTitleFull, breadcrumbs, currentUserIdDisplay,
             adminUserList, generateCategoryDescBtn, categoryNameInput, categoryDescriptionInput, suggestTopicTitleBtn,
@@ -311,9 +329,16 @@
             editPostModal, editPostContentInput, saveEditPostBtn, cancelEditPostBtn, chatMessagesContainer,
             chatMessageInput, sendChatMessageBtn, backToForumFromProfileBtn, adminPermissionsSettings, savePermissionsBtn,
             categoryRolePermissionsAdminContainer, topicRolePermissionsContainer, editTopicModal, editTopicTitleInput, 
-            editTopicRolePermissionsContainer, saveEditTopicBtn, cancelEditTopicBtn;
+            editTopicRolePermissionsContainer, saveEditTopicBtn, cancelEditTopicBtn,
+            registerPromptContainer; // Added for the registration link on the login page
 
 
+        // --- Utility Functions ---
+        /**
+         * Formats a Firebase Timestamp into a user-friendly relative or absolute date string.
+         * @param {Timestamp} firebaseTimestamp - The Firebase Timestamp object.
+         * @returns {string} A formatted date string.
+         */
         function formatTimestamp(firebaseTimestamp) {
             if (!firebaseTimestamp || typeof firebaseTimestamp.seconds !== 'number') {
                 return 'Data inválida';
@@ -322,32 +347,46 @@
             const now = new Date();
             const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-            if (diffInSeconds < 0) return `em breve`; 
+            if (diffInSeconds < 0) return `em breve`; // For future timestamps, if any
             if (diffInSeconds < 60) return `há ${diffInSeconds} seg`;
             const diffInMinutes = Math.floor(diffInSeconds / 60);
             if (diffInMinutes < 60) return `há ${diffInMinutes} min`;
             const diffInHours = Math.floor(diffInMinutes / 60);
             if (diffInHours < 24) return `há ${diffInHours} h`;
 
+            // For older dates, show full date and time
             const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
             return date.toLocaleDateString('pt-BR', options);
         }
 
+        /**
+         * Checks if the current user has a specific permission based on their role.
+         * Admins always have all permissions.
+         * @param {string} permissionKey - The key of the permission to check (from PERMISSIONS object).
+         * @returns {boolean} True if the user has the permission, false otherwise.
+         */
         function hasPermission(permissionKey) {
             if (!userProfileData || !userProfileData.role) {
-                return false;
+                return false; // No profile or role, no permissions
             }
-            if (userProfileData.role === 'Admin') { 
+            if (userProfileData.role === 'Admin') { // Admins have all permissions
                 return true;
             }
             const rolePerms = serverRolePermissionsConfig[userProfileData.role];
             return rolePerms && rolePerms[permissionKey] === true;
         }
 
+        // --- View Management ---
+        /**
+         * Shows a specific view and hides all others.
+         * @param {string} viewName - The name of the view to show (key in the `views` object).
+         * @param {object|null} params - Optional parameters for the view (e.g., userId for profile view).
+         */
         function showView(viewName, params = null) {
             Object.values(views).forEach(view => view.classList.remove('active-view'));
             if (views[viewName]) {
                 views[viewName].classList.add('active-view');
+                // Handle specific view loading logic
                 if (viewName === 'userProfile' && params && params.userId) {
                     loadUserProfileView(params.userId);
                 } else if (viewName === 'myProfile') {
@@ -355,13 +394,19 @@
                 }
             } else {
                 console.error(`View ${viewName} not found. Defaulting to login or forum home.`);
+                // Fallback to login or forum home if the requested view doesn't exist
                 if (currentUser && views.forumHome) views.forumHome.classList.add('active-view');
                 else if (views.login) views.login.classList.add('active-view');
             }
-            window.scrollTo(0, 0);
+            window.scrollTo(0, 0); // Scroll to top when changing views
         }
         
+        /**
+         * Populates global variables with references to DOM elements.
+         * Called once after the DOM is fully loaded.
+         */
         function populateDomElementVariables() {
+            // Views
             views.loading = document.getElementById('loading-view');
             views.login = document.getElementById('login-view');
             views.register = document.getElementById('register-view');
@@ -371,6 +416,7 @@
             views.myProfile = document.getElementById('my-profile-view');
             views.userProfile = document.getElementById('user-profile-view');
 
+            // Header & Navigation
             forumTitleHeader = document.getElementById('forum-title-header');
             forumTitleTag = document.getElementById('forum-title-tag');
             userDisplay = document.getElementById('user-display');
@@ -378,82 +424,101 @@
             registerNav = document.getElementById('register-nav');
             logoutNav = document.getElementById('logout-nav');
             myProfileNav = document.getElementById('my-profile-nav');
-            adminControls = document.getElementById('admin-controls');
-            adminPanelNav = document.getElementById('admin-panel-nav'); 
-            categoriesList = document.getElementById('categories-list');
-            topicsList = document.getElementById('topics-list');
-            postsList = document.getElementById('posts-list');
-            categoryTitle = document.getElementById('category-title');
-            topicTitleFull = document.getElementById('topic-title-full');
+            adminControls = document.getElementById('admin-controls'); // Admin panel container
+            adminPanelNav = document.getElementById('admin-panel-nav'); // Link to toggle admin panel
             breadcrumbs = document.getElementById('breadcrumbs');
             currentUserIdDisplay = document.getElementById('current-user-id-display');
             
-            adminUserList = document.getElementById('admin-user-list');
+            // Forum Content Lists
+            categoriesList = document.getElementById('categories-list');
+            topicsList = document.getElementById('topics-list');
+            postsList = document.getElementById('posts-list');
+            categoryTitle = document.getElementById('category-title'); // In category view
+            topicTitleFull = document.getElementById('topic-title-full'); // In topic view
+
+            // Admin Panel - General Settings
+            adminForumNameInput = document.getElementById('admin-forum-name');
+            saveForumNameBtn = document.getElementById('save-forum-name-btn');
+            adminRegistrationsToggle = document.getElementById('admin-registrations-toggle');
+            saveRegistrationSettingsBtn = document.getElementById('save-registration-settings-btn');
+            
+            // Admin Panel - Category Creation
             generateCategoryDescBtn = document.getElementById('generate-category-description-btn');
             categoryNameInput = document.getElementById('category-name');
             categoryDescriptionInput = document.getElementById('category-description');
+            categoryRolePermissionsAdminContainer = document.getElementById('category-role-permissions-admin-container');
+
+            // Admin Panel - User Management
+            adminUserList = document.getElementById('admin-user-list');
+            
+            // Admin Panel - Role Colors & Permissions
+            adminRoleColorSettings = document.getElementById('admin-role-color-settings');
+            saveRoleColorsBtn = document.getElementById('save-role-colors-btn');
+            adminPermissionsSettings = document.getElementById('admin-permissions-settings');
+            savePermissionsBtn = document.getElementById('save-permissions-btn');
+            
+            // Admin Panel - CS Servers
+            csServersListAdmin = document.getElementById('cs-servers-list-admin');
+            addCsServerBtn = document.getElementById('add-cs-server-btn');
+            csServerModal = document.getElementById('cs-server-modal');
+            csServerForm = document.getElementById('cs-server-form');
+            csServerIdInput = document.getElementById('cs-server-id'); // Hidden input for edit index
+            csServerNameInput = document.getElementById('cs-server-name');
+            csServerConnectInput = document.getElementById('cs-server-connect');
+            cancelCsServerBtn = document.getElementById('cancel-cs-server');
+            serverInfoBannerContainer = document.getElementById('server-info-banner-container'); // Public display
+
+            // Topic Creation (Modal)
             suggestTopicTitleBtn = document.getElementById('suggest-topic-title-btn');
             newTopicContentInput = document.getElementById('new-topic-content');
             newTopicTitleInput = document.getElementById('new-topic-title');
             newTopicCommandInput = document.getElementById('new-topic-command');
+            topicRolePermissionsContainer = document.getElementById('topic-role-permissions-container'); // In create topic modal
 
+            // My Profile View
             myProfileNicknameInput = document.getElementById('my-profile-nickname');
             myProfileSteamUrlInput = document.getElementById('my-profile-steam-url');
             myProfileEmailDisplay = document.getElementById('my-profile-email');
             myProfileRoleDisplay = document.getElementById('my-profile-role');
             myProfileSaveBtn = document.getElementById('my-profile-save-btn');
 
+            // User Profile View (Public)
             userProfileViewDisplayName = document.getElementById('user-profile-view-displayName');
             userProfileViewNickname = document.getElementById('user-profile-view-nickname');
             userProfileViewEmail = document.getElementById('user-profile-view-email');
             userProfileViewRole = document.getElementById('user-profile-view-role');
             userProfileViewSteamLink = document.getElementById('user-profile-view-steam-link');
             userProfileViewRegisteredDate = document.getElementById('user-profile-view-registered-date');
+            backToForumFromProfileBtn = document.getElementById('back-to-forum-from-profile'); 
             
-            adminRoleColorSettings = document.getElementById('admin-role-color-settings');
-            saveRoleColorsBtn = document.getElementById('save-role-colors-btn');
-            
-            adminForumNameInput = document.getElementById('admin-forum-name');
-            saveForumNameBtn = document.getElementById('save-forum-name-btn');
-            adminRegistrationsToggle = document.getElementById('admin-registrations-toggle');
-            saveRegistrationSettingsBtn = document.getElementById('save-registration-settings-btn');
-
-            csServersListAdmin = document.getElementById('cs-servers-list-admin');
-            addCsServerBtn = document.getElementById('add-cs-server-btn');
-            csServerModal = document.getElementById('cs-server-modal');
-            csServerForm = document.getElementById('cs-server-form');
-            csServerIdInput = document.getElementById('cs-server-id');
-            csServerNameInput = document.getElementById('cs-server-name');
-            csServerConnectInput = document.getElementById('cs-server-connect');
-            cancelCsServerBtn = document.getElementById('cancel-cs-server');
-            serverInfoBannerContainer = document.getElementById('server-info-banner-container');
-            
+            // Recent Members & Chat (Aside)
             recentMembersList = document.getElementById('recent-members-list');
+            chatMessagesContainer = document.getElementById('chat-messages');
+            chatMessageInput = document.getElementById('chat-message-input');
+            sendChatMessageBtn = document.getElementById('send-chat-message-btn');
+
+            // Edit Post Modal
             editPostModal = document.getElementById('edit-post-modal');
             editPostContentInput = document.getElementById('edit-post-content');
             saveEditPostBtn = document.getElementById('save-edit-post-btn');
             cancelEditPostBtn = document.getElementById('cancel-edit-post-btn');
 
-            chatMessagesContainer = document.getElementById('chat-messages');
-            chatMessageInput = document.getElementById('chat-message-input');
-            sendChatMessageBtn = document.getElementById('send-chat-message-btn');
-            backToForumFromProfileBtn = document.getElementById('back-to-forum-from-profile'); 
-
-            adminPermissionsSettings = document.getElementById('admin-permissions-settings');
-            savePermissionsBtn = document.getElementById('save-permissions-btn');
-            categoryRolePermissionsAdminContainer = document.getElementById('category-role-permissions-admin-container');
-            topicRolePermissionsContainer = document.getElementById('topic-role-permissions-container'); // For create topic modal
-            
+            // Edit Topic Modal
             editTopicModal = document.getElementById('edit-topic-modal');
             editTopicTitleInput = document.getElementById('edit-topic-title');
             editTopicRolePermissionsContainer = document.getElementById('edit-topic-role-permissions-container');
             saveEditTopicBtn = document.getElementById('save-edit-topic-btn');
             cancelEditTopicBtn = document.getElementById('cancel-edit-topic-btn');
+
+            // Registration link container on login page
+            registerPromptContainer = document.getElementById('register-prompt-container');
         }
 
+        // --- Event Listeners Setup (DOM Ready) ---
         document.addEventListener('DOMContentLoaded', () => {
-            populateDomElementVariables(); 
+            populateDomElementVariables(); // Get all DOM elements first
 
+            // Links to switch between Login and Register views
             const showRegisterViewLink = document.getElementById('show-register-view');
             const showLoginViewLink = document.getElementById('show-login-view');
 
@@ -473,6 +538,7 @@
                     showView('login');
                 });
             }
+            // My Profile navigation
             if (myProfileNav) {
                 myProfileNav.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -480,41 +546,40 @@
                 });
             }
 
+            // Admin Panel Toggle
             if (adminPanelNav && adminControls) {
                 adminPanelNav.addEventListener('click', (e) => {
                     e.preventDefault();
-                    if (adminControls.style.display === 'none' || adminControls.style.display === '') {
-                        adminControls.style.display = 'block';
-                        adminPanelNav.textContent = 'Fechar Painel Admin';
-                        if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
-                            loadUsersForAdmin(); 
-                            loadAdminServerSettings(); 
-                            loadRoleColorSettings();
-                            loadRolePermissionsSettings();
-                            populateCategoryRolePermissionsCheckboxes(); 
-                            populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer); // For create topic modal
-                        }
-                    } else {
-                        adminControls.style.display = 'none';
-                        adminPanelNav.textContent = 'Painel Admin';
+                    const isAdminPanelOpen = adminControls.style.display === 'block';
+                    adminControls.style.display = isAdminPanelOpen ? 'none' : 'block';
+                    adminPanelNav.textContent = isAdminPanelOpen ? 'Painel Admin' : 'Fechar Painel Admin';
+                    if (!isAdminPanelOpen && hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
+                        // Load admin data only when opening and if has permission
+                        loadUsersForAdmin(); 
+                        loadAdminServerSettings(); 
+                        loadRoleColorSettings();
+                        loadRolePermissionsSettings();
+                        populateCategoryRolePermissionsCheckboxes(); 
+                        populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer); // For create topic modal
                     }
                 });
             }
 
 
+            // Form Submissions & Button Clicks
             if (myProfileSaveBtn) myProfileSaveBtn.addEventListener('click', saveMyProfile);
             if (saveRoleColorsBtn) saveRoleColorsBtn.addEventListener('click', saveRoleColors);
             if (saveForumNameBtn) saveForumNameBtn.addEventListener('click', saveForumName);
             if (saveRegistrationSettingsBtn) saveRegistrationSettingsBtn.addEventListener('click', saveRegistrationSettings);
-            if (addCsServerBtn) addCsServerBtn.addEventListener('click', () => openCsServerModal());
+            if (addCsServerBtn) addCsServerBtn.addEventListener('click', () => openCsServerModal()); // Open with no index for new server
             if (csServerForm) csServerForm.addEventListener('submit', saveCsServer);
             if (cancelCsServerBtn) cancelCsServerBtn.addEventListener('click', () => csServerModal.style.display = 'none');
             if (saveEditPostBtn) saveEditPostBtn.addEventListener('click', saveEditedPost);
             if (cancelEditPostBtn) cancelEditPostBtn.addEventListener('click', () => editPostModal.style.display = 'none');
             if (sendChatMessageBtn) sendChatMessageBtn.addEventListener('click', sendChatMessage);
-            if (chatMessageInput) {
+            if (chatMessageInput) { // Send chat message on Enter key
                 chatMessageInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && !e.shiftKey) { // Shift+Enter for newline
                         e.preventDefault();
                         sendChatMessage();
                     }
@@ -523,12 +588,14 @@
             if (backToForumFromProfileBtn) backToForumFromProfileBtn.addEventListener('click', () => showView('forumHome'));
             if (savePermissionsBtn) savePermissionsBtn.addEventListener('click', saveRolePermissions);
             
+            // Auth Forms
             const loginForm = document.getElementById('login-form');
             if (loginForm) loginForm.addEventListener('submit', handleLogin);
             
             const registerForm = document.getElementById('register-form');
             if (registerForm) registerForm.addEventListener('submit', handleRegister);
 
+            // Auth Navigation Links
             if (logoutNav) logoutNav.addEventListener('click', handleLogout);
             if (loginNav) loginNav.addEventListener('click', (e) => { e.preventDefault(); showView('login'); });
             if (registerNav) registerNav.addEventListener('click', (e) => {
@@ -540,43 +607,53 @@
                 }
             });
 
+            // Forum Creation Forms
             const createCategoryForm = document.getElementById('create-category-form');
             if (createCategoryForm) createCategoryForm.addEventListener('submit', handleCreateCategory);
 
-            const createTopicFormModal = document.getElementById('create-topic-form-modal');
+            const createTopicFormModal = document.getElementById('create-topic-form-modal'); // Form inside the modal
             if (createTopicFormModal) createTopicFormModal.addEventListener('submit', handleCreateTopic);
             
-            const showCreateTopicModalBtn = document.getElementById('show-create-topic-modal');
+            const showCreateTopicModalBtn = document.getElementById('show-create-topic-modal'); // Button to open modal
             if(showCreateTopicModalBtn) showCreateTopicModalBtn.addEventListener('click', openCreateTopicModal);
 
-            const cancelCreateTopicBtn = document.getElementById('cancel-create-topic');
+            const cancelCreateTopicBtn = document.getElementById('cancel-create-topic'); // Button in modal
             if(cancelCreateTopicBtn) cancelCreateTopicBtn.addEventListener('click', () => {
                 document.getElementById('create-topic-modal').style.display = 'none';
             });
 
-            const createPostForm = document.getElementById('create-post-form');
+            const createPostForm = document.getElementById('create-post-form'); // Form in topic view
             if (createPostForm) createPostForm.addEventListener('submit', handleCreatePost);
             
+            // Forum Navigation (Event Delegation)
             if (breadcrumbs) breadcrumbs.addEventListener('click', handleBreadcrumbNavigation);
             if (categoriesList) categoriesList.addEventListener('click', handleCategoryListClick);
             if (topicsList) topicsList.addEventListener('click', handleTopicListClick);
             if (postsList) postsList.addEventListener('click', handlePostListClick);
 
+            // AI Helper Buttons
             if (generateCategoryDescBtn) generateCategoryDescBtn.addEventListener('click', generateCategoryDescription);
             if (suggestTopicTitleBtn) suggestTopicTitleBtn.addEventListener('click', suggestTopicTitle);
 
+            // Edit Topic Modal Buttons
             if (saveEditTopicBtn) saveEditTopicBtn.addEventListener('click', saveEditedTopic);
             if (cancelEditTopicBtn) cancelEditTopicBtn.addEventListener('click', () => editTopicModal.style.display = 'none');
 
 
+            // Initialize Authentication
             if (auth) {
-                initAuth(); 
+                initAuth(); // Handles initial sign-in (e.g., with custom token)
             } else {
                 console.warn("Firebase Auth not available at DOMContentLoaded. Login might be impaired.");
-                showView('login'); 
+                showView('login'); // Default to login if auth isn't ready
             }
         });
 
+        // --- Breadcrumb Navigation ---
+        /**
+         * Updates the breadcrumb display.
+         * @param {Array<object>} path - Array of path objects {name, view, id}.
+         */
         function updateBreadcrumbs(path) {
             if (!breadcrumbs) return;
             breadcrumbs.innerHTML = `<a href="#" data-view="forumHome" class="hover:text-blue-400">Início</a>`;
@@ -585,6 +662,9 @@
             });
         }
 
+        /**
+         * Handles clicks on breadcrumb links.
+         */
         function handleBreadcrumbNavigation(e) {
             if (e.target.tagName === 'A' && e.target.dataset.view) {
                 e.preventDefault();
@@ -592,9 +672,15 @@
                 const id = e.target.dataset.id;
                 if (view === 'forumHome') loadCategories();
                 else if (view === 'category' && id) loadTopics(id, e.target.textContent);
+                // Topic view is handled by loadPosts, breadcrumbs updated there
             }
         }
 
+        // --- Firestore Listener Management ---
+        /**
+         * Clears all active Firestore listeners.
+         * Call this before re-attaching listeners (e.g., on auth state change).
+         */
         function clearFirestoreListeners() {
             if (unsubscribeCategories) unsubscribeCategories();
             if (unsubscribeTopics) unsubscribeTopics();
@@ -602,7 +688,7 @@
             if (unsubscribeServerConfig) unsubscribeServerConfig();
             if (unsubscribeRecentMembers) unsubscribeRecentMembers();
             if (unsubscribeChatMessages) unsubscribeChatMessages();
-            if (unsubscribeCurrentUserProfile) unsubscribeCurrentUserProfile(); 
+            if (unsubscribeCurrentUserProfile) unsubscribeCurrentUserProfile(); // Clear user's own profile listener
             unsubscribeCategories = null;
             unsubscribeTopics = null;
             unsubscribePosts = null;
@@ -613,48 +699,56 @@
             console.log("All Firestore listeners cleared.");
         }
 
+
+        // --- Authentication State & Profile Handling ---
         if (auth) {
             onAuthStateChanged(auth, async (user) => {
-                clearFirestoreListeners();
-                showView('loading');
+                clearFirestoreListeners(); // Clear old listeners before setting new ones
+                showView('loading'); // Show loading indicator during auth change
                 if (user) {
                     currentUser = user;
                     currentUserId = user.uid;
                     const userProfileRef = doc(db, `artifacts/${firestorePathAppId}/public/data/userProfiles`, currentUserId);
 
+                    // Listen for real-time updates to the current user's profile
                     unsubscribeCurrentUserProfile = onSnapshot(userProfileRef, async (profileSnap) => {
-                        if (!currentUser) return; 
+                        if (!currentUser) return; // If user logs out while listener is active
 
-                        let initialProfileLoad = !userProfileData; 
+                        let initialProfileLoad = !userProfileData; // Check if this is the first time loading profile data
 
                         if (profileSnap.exists()) {
                             const updatedProfileData = profileSnap.data();
-                            const oldRole = userProfileData ? userProfileData.role : null;
+                            const oldRole = userProfileData ? userProfileData.role : null; // Store old role for comparison
                             userProfileData = updatedProfileData;
                             isAdmin = (userProfileData.role === 'Admin');
                             
                             console.log("[Profile Listener] Profile data updated:", userProfileData);
 
+                            // Update currentRolePermissions based on the new profile role
                             if (userProfileData.role && serverRolePermissionsConfig[userProfileData.role]) {
                                 currentRolePermissions = serverRolePermissionsConfig[userProfileData.role];
-                            } else { 
+                            } else { // Fallback if role not in config (should not happen with defaults)
                                 currentRolePermissions = {};
                                 if (userProfileData.role) console.warn(`Role "${userProfileData.role}" not found in serverRolePermissionsConfig.`);
                             }
                             console.log("[Profile Listener] Current role permissions set:", currentRolePermissions);
 
 
+                            // Update UI elements that depend on user profile
                             userDisplay.textContent = `Bem-vindo, ${userProfileData.nickname || userProfileData.displayName || currentUser.email.split('@')[0]}`;
                             currentUserIdDisplay.style.display = isAdmin ? 'inline-block' : 'none';
                             currentUserIdDisplay.textContent = isAdmin ? `User ID: ${currentUserId}` : '';
                             
+                            // If 'My Profile' view is active, reload its content
                             if (views.myProfile && views.myProfile.classList.contains('active-view')) {
                                 loadMyProfileView(); 
                             }
+                            // If it's the initial load or role changed, refresh admin panel elements if visible
                             if (initialProfileLoad || (oldRole && oldRole !== userProfileData.role)) {
                                 console.log(`[Profile Listener] Initial profile load (${initialProfileLoad}) or role change (from ${oldRole} to ${userProfileData.role}). Refreshing UI components.`);
                                 adminPanelNav.style.display = hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) ? 'inline-block' : 'none';
                                 if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) && adminControls.style.display === 'block') {
+                                    // Reload admin panel sections if it's open and permissions allow
                                     loadUsersForAdmin(); 
                                     loadAdminServerSettings(); 
                                     loadRoleColorSettings();
@@ -662,6 +756,7 @@
                                     populateCategoryRolePermissionsCheckboxes(); 
                                     populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer);
                                 } else if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
+                                    // Hide admin panel if permissions are lost
                                     adminControls.style.display = 'none'; 
                                     adminPanelNav.textContent = 'Painel Admin';
                                 }
@@ -669,6 +764,7 @@
 
 
                         } else {
+                            // User is authenticated, but no profile document exists. Create one.
                             console.log("[Profile Listener] User profile does not exist. Attempting to create.");
                             try {
                                 userProfileData = {
@@ -678,29 +774,33 @@
                                     steamProfileUrl: "",
                                     createdAt: Timestamp.now(),
                                     lastSeen: Timestamp.now(),
-                                    role: 'Membro' 
+                                    role: 'Membro' // Default role for new users
                                 };
                                 await setDoc(userProfileRef, userProfileData);
                                 console.log("[Auth/Profile Listener] New user profile created:", JSON.stringify(userProfileData));
-                                isAdmin = (userProfileData.role === 'Admin'); 
-                                initialProfileLoad = true; 
+                                isAdmin = (userProfileData.role === 'Admin'); // Check admin status after creation
+                                initialProfileLoad = true; // Treat as initial load
                             } catch (error) {
                                 console.error("[Auth/Profile Listener] Error creating user profile:", error);
                                 showModal("Erro ao criar perfil de usuário: " + error.message);
+                                // Fallback profile data if creation fails, to prevent app from breaking
                                 userProfileData = { role: 'Membro', lastSeen: Timestamp.now() }; 
                                 isAdmin = false;
                             }
                         }
 
-                        if (initialProfileLoad && userProfileData) { 
+                        // After profile is loaded (either existing or newly created)
+                        if (initialProfileLoad && userProfileData) { // Only proceed if profile is now available
+                            // Update navigation for logged-in user
                             loginNav.style.display = 'none';
                             logoutNav.style.display = 'inline-block';
                             myProfileNav.style.display = 'inline-block';
                             adminPanelNav.style.display = hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) ? 'inline-block' : 'none';
                             
                             try {
-                                await loadServerConfig(); 
+                                await loadServerConfig(); // Load server-wide settings (roles, permissions, etc.)
                                 console.log("[Auth State] Server config loaded. Proceeding with other data loads.");
+                                // If admin panel was set to be open, load its data
                                 if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) && adminControls.style.display === 'block') {
                                     loadUsersForAdmin();
                                     loadAdminServerSettings(); 
@@ -709,32 +809,33 @@
                                     populateCategoryRolePermissionsCheckboxes();
                                     populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer);
                                 } else if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
-                                     adminControls.style.display = 'none';
+                                     adminControls.style.display = 'none'; // Ensure it's closed if no perms
                                 }
-                                registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
-                                loadCategories();
+                                registerNav.style.display = registrationsOpen ? 'inline-block' : 'none'; // Show/hide main register nav link
+                                loadCategories(); // Load main forum content
                                 loadRecentMembers();
                                 loadChatMessages();
-                                showView('forumHome'); 
+                                showView('forumHome'); // Show the main forum view
                             } catch (error) {
                                 console.error("Failed to load initial server config:", error);
                                 showModal("Erro crítico ao carregar configurações do servidor.", "error");
-                                registerNav.style.display = 'inline-block'; 
-                                showView('forumHome'); 
+                                registerNav.style.display = 'inline-block'; // Fallback for register nav visibility
+                                showView('forumHome'); // Still try to show forum home
                             }
                         }
                     }, (error) => {
                         console.error("[Profile Listener] Error listening to user profile:", error);
                         showModal("Erro ao carregar dados do perfil. Tente recarregar.", "error");
-                        if (auth) signOut(auth);
+                        if (auth) signOut(auth); // Log out user on critical profile error
                     });
                     
+                    // Update lastSeen timestamp (best effort, don't block UI for this)
                     try {
                         await updateDoc(userProfileRef, { lastSeen: Timestamp.now() });
                     } catch (e) { console.warn("Could not update lastSeen initially:", e.message); }
 
-                } else { 
-                    if (unsubscribeCurrentUserProfile) { 
+                } else { // User is logged out
+                    if (unsubscribeCurrentUserProfile) { // Clean up profile listener if it was active
                         unsubscribeCurrentUserProfile();
                         unsubscribeCurrentUserProfile = null;
                     }
@@ -742,46 +843,54 @@
                     currentUserId = null; 
                     userProfileData = null;
                     isAdmin = false;
-                    currentRolePermissions = {};
+                    currentRolePermissions = {}; // Reset permissions
 
+                    // Update UI for logged-out state
                     userDisplay.textContent = 'Você não está logado.';
                     currentUserIdDisplay.style.display = 'none';
                     loginNav.style.display = 'inline-block';
                     logoutNav.style.display = 'none';
                     myProfileNav.style.display = 'none';
-                    adminControls.style.display = 'none';
+                    adminControls.style.display = 'none'; // Hide admin panel
                     adminPanelNav.style.display = 'none';
-                    adminPanelNav.textContent = 'Painel Admin';
+                    adminPanelNav.textContent = 'Painel Admin'; // Reset admin panel button text
                     
-                    await loadServerConfig(); 
-                    registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
+                    await loadServerConfig(); // Load server config to know if registrations are open
+                    registerNav.style.display = registrationsOpen ? 'inline-block' : 'none'; // Show/hide main register nav link
+                    // The registerPromptContainer on the login page will be handled by loadServerConfig's onSnapshot
 
+                    // Clear dynamic content areas
                     if(serverInfoBannerContainer) serverInfoBannerContainer.innerHTML = ''; 
                     if(recentMembersList) recentMembersList.innerHTML = ''; 
                     if(chatMessagesContainer) chatMessagesContainer.innerHTML = ''; 
-                    showView('login');
+                    showView('login'); // Show login view
                 }
             });
         } else {
-            console.error("Auth service is not available.");
-            showModal("Serviço de autenticação indisponível.");
-            showView('login');
+            console.error("Auth service is not available. Application will not function correctly.");
+            showModal("Serviço de autenticação indisponível. O aplicativo não funcionará.");
+            showView('login'); // Fallback to login view
         }
 
+        /**
+         * Initializes authentication, attempting to sign in with a custom token if provided.
+         */
         async function initAuth() {
             if (!auth) {
                 console.error("Firebase Auth not initialized. Skipping initAuth.");
-                showView('login'); 
+                showView('login'); // Default to login if auth isn't ready
                 return;
             }
-            showView('loading');
+            showView('loading'); // Show loading while attempting auth
             try {
-                if (finalInitialAuthToken) { 
+                if (finalInitialAuthToken) { // If a custom token was determined to be used
                     console.log("Attempting sign-in with determined custom token.");
                     await signInWithCustomToken(auth, finalInitialAuthToken);
                     console.log("Successfully signed in with custom token.");
+                    // onAuthStateChanged will handle the rest of the UI setup
                 } else {
                      console.log("No custom token. Waiting for onAuthStateChanged or user login.");
+                     // If no token and no user currently, onAuthStateChanged will show login
                      if (!auth.currentUser) { 
                         showView('login'); 
                      }
@@ -789,10 +898,11 @@
             } catch (error) {
                 console.error("Authentication initialization error:", error); 
                 showModal("Erro na autenticação automática: " + error.message + ". Por favor, faça login manualmente.", "error");
-                showView('login');
+                showView('login'); // Fallback to manual login
             }
         }
 
+        // --- Auth Actions (Login, Register, Logout) ---
         async function handleLogin(e) {
             e.preventDefault();
             if (!auth) { showModal("Serviço de autenticação indisponível."); return; }
@@ -800,6 +910,7 @@
             const password = e.target.password.value;
             try {
                 await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle UI changes
             } catch (error) {
                 console.error("Error signing in:", error);
                 showModal("Erro ao fazer login: " + error.message);
@@ -808,7 +919,7 @@
 
         async function handleRegister(e) {
             e.preventDefault();
-            if (!registrationsOpen) {
+            if (!registrationsOpen) { // Check if registrations are allowed by admin
                 showModal("Novos cadastros estão temporariamente desabilitados.", "error");
                 return;
             }
@@ -824,8 +935,9 @@
             
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will create the user profile if it's a new user
                 showModal("Registro bem-sucedido! Faça o login.", "success");
-                showView('login'); 
+                showView('login'); // Direct user to login after registration
             } catch (error) {
                 console.error("Error registering:", error);
                 showModal("Erro ao registrar: " + error.message);
@@ -835,19 +947,22 @@
         async function handleLogout() {
             if (!auth) { showModal("Serviço de autenticação indisponível."); return; }
             try {
+                // Update lastSeen before logging out
                 if(currentUser && db && currentUserId) { 
                     const userProfileRef = doc(db, `artifacts/${firestorePathAppId}/public/data/userProfiles`, currentUserId);
                     await updateDoc(userProfileRef, { lastSeen: Timestamp.now() });
                 }
                 await signOut(auth);
+                // onAuthStateChanged will handle UI changes
             } catch (error) {
                 console.error("Error signing out:", error);
                 showModal("Erro ao fazer logout: " + error.message);
             }
         }
         
+        // --- Firestore Collection References ---
         let categoriesCol, topicsCol, postsCol, userProfilesCol, serverConfigDocRef, chatMessagesCol;
-        if (db) {
+        if (db) { // Ensure db is initialized
             categoriesCol = collection(db, `artifacts/${firestorePathAppId}/public/data/categories`);
             topicsCol = collection(db, `artifacts/${firestorePathAppId}/public/data/topics`);
             postsCol = collection(db, `artifacts/${firestorePathAppId}/public/data/posts`);
@@ -855,15 +970,17 @@
             serverConfigDocRef = doc(db, `artifacts/${firestorePathAppId}/public/data/serverConfig`, 'config');
             chatMessagesCol = collection(db, `artifacts/${firestorePathAppId}/public/data/chatMessages`);
         } else {
-            console.error("Firestore DB service is not available.");
+            console.error("Firestore DB service is not available. Core functionality will be impaired.");
+            // Modals or UI indicators should reflect this critical failure.
         }
         
+        // --- Clipboard Utility ---
         function copyToClipboard(text) {
             const textarea = document.createElement('textarea');
             textarea.value = text;
             document.body.appendChild(textarea);
             textarea.select();
-            textarea.setSelectionRange(0, 99999); 
+            textarea.setSelectionRange(0, 99999); // For mobile devices
             try {
                 document.execCommand('copy');
                 showModal('Comando copiado para a área de transferência!', 'success');
@@ -874,16 +991,20 @@
             document.body.removeChild(textarea);
         }
 
+        // --- Admin Panel: Server Settings ---
+        /**
+         * Loads server settings (forum name, registration status, CS servers) into the admin panel.
+         */
         async function loadAdminServerSettings() { 
             if (!db || !serverConfigDocRef || !adminForumNameInput || !adminRegistrationsToggle) return;
             try {
-                const docSnap = await getDoc(serverConfigDocRef); 
+                const docSnap = await getDoc(serverConfigDocRef); // Get current settings
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    adminForumNameInput.value = data.forumName || 'Negativa Server - Fórum';
-                    adminRegistrationsToggle.checked = data.registrationsOpen === undefined ? true : data.registrationsOpen;
-                    renderAdminCsServersList(data.csServers || []);
-                } else { 
+                    adminForumNameInput.value = data.forumName || 'Negativa Server - Fórum'; // Default if not set
+                    adminRegistrationsToggle.checked = data.registrationsOpen === undefined ? true : data.registrationsOpen; // Default to true
+                    renderAdminCsServersList(data.csServers || []); // Render list of CS servers
+                } else { // If no config doc, use defaults
                     adminForumNameInput.value = 'Negativa Server - Fórum'; 
                     adminRegistrationsToggle.checked = true; 
                     renderAdminCsServersList([]);
@@ -893,6 +1014,9 @@
             }
         }
         
+        /**
+         * Saves the forum name from the admin panel.
+         */
         async function saveForumName() {
             if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
                  showModal("Você não tem permissão para alterar o nome do fórum.", "error"); return;
@@ -904,12 +1028,16 @@
             try {
                 await setDoc(serverConfigDocRef, { forumName: newName }, { merge: true });
                 showModal("Nome do fórum salvo com sucesso!", "success");
+                // The onSnapshot listener on serverConfigDocRef will update the public display
             } catch (error) {
                 console.error("Error saving forum name:", error);
                 showModal("Erro ao salvar nome do fórum: " + error.message, "error");
             }
         }
         
+        /**
+         * Saves the registration open/closed status from the admin panel.
+         */
         async function saveRegistrationSettings() {
             if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
                 showModal("Você não tem permissão para alterar as configurações de registro.", "error"); return;
@@ -917,6 +1045,8 @@
             const newRegistrationsOpen = adminRegistrationsToggle.checked;
             try {
                 await setDoc(serverConfigDocRef, { registrationsOpen: newRegistrationsOpen }, { merge: true });
+                // The local 'registrationsOpen' variable and UI (nav link, login page link)
+                // will be updated by the onSnapshot listener in loadServerConfig.
                 showModal(`Cadastros ${newRegistrationsOpen ? 'abertos' : 'fechados'} com sucesso!`, "success");
             } catch (error) {
                 console.error("Error saving registration settings:", error);
@@ -925,9 +1055,14 @@
         }
 
         
+        // --- Admin Panel: CS Server Management ---
+        /**
+         * Renders the list of CS servers in the admin panel.
+         * @param {Array<object>} servers - Array of server objects.
+         */
         function renderAdminCsServersList(servers = []) {
             if (!csServersListAdmin) return;
-            csServersListAdmin.innerHTML = '';
+            csServersListAdmin.innerHTML = ''; // Clear previous list
             if (servers.length === 0) {
                 csServersListAdmin.innerHTML = '<p class="text-sm text-gray-400">Nenhum servidor CS2 configurado.</p>';
                 return;
@@ -948,6 +1083,7 @@
                 csServersListAdmin.appendChild(serverDiv);
             });
 
+            // Add event listeners for edit/delete buttons
             csServersListAdmin.querySelectorAll('.edit-cs-server-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => openCsServerModal(parseInt(e.target.dataset.index)));
             });
@@ -956,11 +1092,15 @@
             });
         }
 
+        /**
+         * Opens the CS server configuration modal (for adding or editing).
+         * @param {number|null} index - The index of the server to edit, or null to add a new one.
+         */
         async function openCsServerModal(index = null) {
             if (!csServerForm || !csServerModal || !csServerIdInput || !csServerNameInput || !csServerConnectInput) return;
-            csServerForm.reset();
-            csServerIdInput.value = index !== null ? index : ''; 
-            if (index !== null) {
+            csServerForm.reset(); // Clear form fields
+            csServerIdInput.value = index !== null ? index : ''; // Store index if editing
+            if (index !== null) { // If editing, load existing server data
                 const docSnap = await getDoc(serverConfigDocRef); 
                 if (docSnap.exists() && docSnap.data().csServers && docSnap.data().csServers[index]) {
                     const server = docSnap.data().csServers[index];
@@ -968,15 +1108,18 @@
                     csServerConnectInput.value = server.connectCommand || '';
                 }
             }
-            csServerModal.style.display = 'flex';
+            csServerModal.style.display = 'flex'; // Show the modal
         }
 
+        /**
+         * Saves a CS server (new or edited) to Firestore.
+         */
         async function saveCsServer(e) {
             e.preventDefault();
             if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
                  showModal("Você não tem permissão para gerenciar servidores.", "error"); return;
             }
-            const serverId = csServerIdInput.value; 
+            const serverId = csServerIdInput.value; // Index if editing, empty if new
             const displayName = csServerNameInput.value.trim();
             const connectCommand = csServerConnectInput.value.trim();
 
@@ -988,25 +1131,30 @@
                 const docSnap = await getDoc(serverConfigDocRef);
                 let currentServers = [];
                 if (docSnap.exists() && docSnap.data().csServers) {
-                    currentServers = [...docSnap.data().csServers]; 
+                    currentServers = [...docSnap.data().csServers]; // Get copy of current servers array
                 }
 
                 const newServer = { displayName, connectCommand };
-                if (serverId !== '' && currentServers[parseInt(serverId)]) { 
+                if (serverId !== '' && currentServers[parseInt(serverId)]) { // Editing existing
                     currentServers[parseInt(serverId)] = newServer;
-                } else { 
+                } else { // Adding new
                     currentServers.push(newServer);
                 }
                 
                 await setDoc(serverConfigDocRef, { csServers: currentServers }, { merge: true });
                 showModal(`Servidor CS2 ${serverId !== '' ? 'atualizado' : 'adicionado'} com sucesso!`, "success");
-                if(csServerModal) csServerModal.style.display = 'none';
+                if(csServerModal) csServerModal.style.display = 'none'; // Close modal
+                // The onSnapshot listener on serverConfigDocRef will re-render the admin list and public banners.
             } catch (error) {
                 console.error("Error saving CS server:", error);
                 showModal("Erro ao salvar servidor CS2: " + error.message, "error");
             }
         }
         
+        /**
+         * Deletes a CS server from Firestore.
+         * @param {number} index - The index of the server to delete.
+         */
         async function deleteCsServer(index) {
              if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
                  showModal("Você não tem permissão para gerenciar servidores.", "error"); return;
@@ -1016,9 +1164,10 @@
                     const docSnap = await getDoc(serverConfigDocRef);
                     if (docSnap.exists() && docSnap.data().csServers) {
                         let currentServers = [...docSnap.data().csServers];
-                        currentServers.splice(index, 1); 
+                        currentServers.splice(index, 1); // Remove server at index
                         await setDoc(serverConfigDocRef, { csServers: currentServers }, { merge: true });
                         showModal("Servidor CS2 excluído com sucesso!", "success");
+                        // onSnapshot will update the UI.
                     }
                 } catch (error) {
                     console.error("Error deleting CS server:", error);
@@ -1027,9 +1176,13 @@
             });
         }
 
+        /**
+         * Renders public CS server banners based on server configuration.
+         * @param {Array<object>} serversFromConfig - Array of server objects from Firestore.
+         */
         function loadPublicCsServerBanners(serversFromConfig) { 
             if (!serverInfoBannerContainer) return;
-            serverInfoBannerContainer.innerHTML = ''; 
+            serverInfoBannerContainer.innerHTML = ''; // Clear existing banners
             if (serversFromConfig && serversFromConfig.length > 0) {
                 serversFromConfig.forEach(server => {
                     if (server.displayName && server.connectCommand) {
@@ -1045,6 +1198,7 @@
                         serverInfoBannerContainer.appendChild(banner);
                     }
                 });
+                // Add event listeners for copy buttons
                 serverInfoBannerContainer.querySelectorAll('.copy-cs-command-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => copyToClipboard(e.target.dataset.command));
                 });
@@ -1052,21 +1206,27 @@
         }
 
 
+        // --- Admin Panel: User Management ---
+        /**
+         * Loads and displays the list of users in the admin panel.
+         */
         async function loadUsersForAdmin() {
             if (!db || !userProfilesCol || !hasPermission(PERMISSIONS.MANAGE_USERS) || !adminUserList) return;
             adminUserList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando usuários...</p>';
             try {
-                const snapshot = await getDocs(query(userProfilesCol)); 
+                const snapshot = await getDocs(query(userProfilesCol)); // Get all user profiles
                 if (snapshot.empty) {
                     adminUserList.innerHTML = '<p class="text-gray-400 p-4 text-center">Nenhum usuário registrado encontrado.</p>';
                     return;
                 }
                 let usersHtml = '';
+                // Sort users by email for consistent display
                 const userDocs = snapshot.docs.sort((a,b) => (a.data().email || '').localeCompare(b.data().email || ''));
 
                 userDocs.forEach(userDoc => {
                     const userId = userDoc.id;
                     const profile = userDoc.data();
+                    // Prevent admin from changing their own role if they are the one editing
                     const isCurrentUserAdminEditingSelf = profile.role === 'Admin' && currentUserId === userId;
 
                     usersHtml += `
@@ -1089,8 +1249,9 @@
                 });
                 adminUserList.innerHTML = usersHtml;
 
+                // Add event listeners to "Save" buttons for each user
                 document.querySelectorAll('.save-user-details-btn').forEach(button => {
-                    if (button.disabled) return; 
+                    if (button.disabled) return; // Skip disabled buttons (admin editing self)
                     button.addEventListener('click', async (e) => {
                         const userIdToUpdate = e.target.dataset.userid;
                         const newRole = document.getElementById(`select-role-${userIdToUpdate}`).value;
@@ -1107,15 +1268,19 @@
             }
         }
         
+        /**
+         * Updates a user's details (role, nickname, Steam URL) by an admin.
+         */
         async function updateUserDetailsByAdmin(userId, newRole, newNickname, newSteamUrl) {
             if (!hasPermission(PERMISSIONS.MANAGE_USERS)) {
                  showModal("Você não tem permissão para gerenciar usuários.", "error"); return;
             }
             const userToUpdateRef = doc(userProfilesCol, userId);
             try {
+                // Prevent an admin from accidentally removing their own 'Admin' role
                 if (userId === currentUserId && newRole !== 'Admin' && isAdmin) { 
                      showModal("Administradores não podem remover seu próprio cargo de 'Admin'.", "error");
-                     document.getElementById(`select-role-${userId}`).value = 'Admin'; 
+                     document.getElementById(`select-role-${userId}`).value = 'Admin'; // Revert dropdown
                      return;
                 }
                 await updateDoc(userToUpdateRef, { 
@@ -1124,17 +1289,26 @@
                     steamProfileUrl: newSteamUrl
                 });
                 showModal(`Detalhes do usuário atualizados.`, "success");
+                // Update the displayed role in the admin list immediately
                 const roleDisplaySpan = document.getElementById(`role-display-${userId}`);
                 if (roleDisplaySpan) roleDisplaySpan.textContent = newRole; 
+                // The user's own profile listener (if they are the one being edited) will pick up changes.
             } catch (error) {
                 console.error("Error updating user details by admin:", error);
                 showModal("Erro ao atualizar detalhes do usuário: " + error.message, "error");
             }
         }
 
+        // --- Admin Panel: Category & Topic Role Permissions UI ---
+        /**
+         * Populates checkboxes for assigning roles that can view a new category (in admin panel).
+         */
         function populateCategoryRolePermissionsCheckboxes() {
             if (!categoryRolePermissionsAdminContainer) return;
             categoryRolePermissionsAdminContainer.innerHTML = ''; 
+            const listContainer = document.createElement('div'); // Changed from gridContainer
+            listContainer.className = "flex flex-col space-y-1"; // Use flex column
+
             defaultRoles.forEach(role => {
                 if (role === 'Admin') return; 
                 const checkboxId = `category-perm-role-${role}`;
@@ -1145,16 +1319,26 @@
                            class="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-400">
                     <span>${role}</span>
                 `;
-                categoryRolePermissionsAdminContainer.appendChild(label);
+                listContainer.appendChild(label); // Append to listContainer
             });
+            categoryRolePermissionsAdminContainer.appendChild(listContainer); // Append the list
         }
 
+        /**
+         * Populates checkboxes for assigning roles that can view a topic.
+         * Used in "Create Topic" modal and "Edit Topic" modal.
+         * @param {HTMLElement} container - The DOM element to populate with checkboxes.
+         * @param {Array<string>} currentAllowedRoles - Array of roles currently allowed (for pre-checking).
+         */
         function populateTopicRolePermissionsCheckboxes(container, currentAllowedRoles = []) {
             if (!container) return;
-            container.innerHTML = ''; // Clear existing
+            container.innerHTML = ''; 
+            const listContainer = document.createElement('div'); // Changed from gridContainer
+            listContainer.className = "flex flex-col space-y-1"; // Use flex column
+
             defaultRoles.forEach(role => {
-                if (role === 'Admin') return; // Admins always have access
-                const checkboxId = `topic-perm-role-${role}-${container.id}`; // Make ID unique per container
+                if (role === 'Admin') return; 
+                const checkboxId = `topic-perm-role-${role}-${container.id}`; 
                 const isChecked = currentAllowedRoles.includes(role);
                 const label = document.createElement('label');
                 label.className = 'flex items-center space-x-2 text-sm text-gray-300';
@@ -1164,11 +1348,16 @@
                            ${isChecked ? 'checked' : ''}>
                     <span>${role}</span>
                 `;
-                container.appendChild(label);
+                listContainer.appendChild(label); // Append to listContainer
             });
+            container.appendChild(listContainer); // Append the list
         }
 
 
+        // --- Forum Content Creation (Categories, Topics, Posts) ---
+        /**
+         * Handles the creation of a new category.
+         */
         async function handleCreateCategory(e) {
             e.preventDefault();
              if (!hasPermission(PERMISSIONS.MANAGE_CATEGORIES)) {
@@ -1180,7 +1369,7 @@
                 showModal("O nome da categoria é obrigatório.", "error"); return;
             }
 
-            const selectedRoles = [];
+            const selectedRoles = []; // Roles allowed to view this category
             const checkboxes = document.querySelectorAll('#category-role-permissions-admin-container input[name="categoryAllowedRoles"]:checked');
             checkboxes.forEach(checkbox => selectedRoles.push(checkbox.value));
 
@@ -1193,45 +1382,49 @@
                     createdAt: Timestamp.now(),
                     topicCount: 0,
                     postCount: 0,
-                    lastActivity: Timestamp.now(), 
-                    lastActivityDetails: { 
-                        topicId: null,
+                    lastActivity: Timestamp.now(), // Initial activity is creation
+                    lastActivityDetails: { // Details about the last activity
+                        topicId: null, // No topic yet
                         topicTitle: "Nenhum tópico ainda",
                         userId: currentUserId, 
                         userDisplayName: userDisplayNameForActivity,
                         timestamp: Timestamp.now()
                     },
-                    allowedRoles: selectedRoles 
+                    allowedRoles: selectedRoles // Store empty array if public, or roles if restricted
                 });
                 showModal("Categoria criada com sucesso!", "success");
-                e.target.reset();
+                e.target.reset(); // Clear form
+                // Clear role permission checkboxes for the next category
                 document.querySelectorAll('#category-role-permissions-admin-container input[name="categoryAllowedRoles"]').forEach(cb => cb.checked = false);
-
+                // The categories list will update via its onSnapshot listener.
             } catch (error) {
                 console.error("Error creating category:", error);
                 showModal("Erro ao criar categoria: " + error.message);
             }
         }
 
+        /**
+         * Loads and displays categories on the forum home page.
+         */
         async function loadCategories() {
             if (!db || !categoriesCol || !userProfilesCol || !categoriesList) { 
                 if(categoriesList) categoriesList.innerHTML = '<div class="p-4 text-center text-red-400">Erro: Serviço de banco de dados indisponível.</div>';
                 showView('forumHome'); 
                 return; 
             }
-            if (!currentUser) { 
+            if (!currentUser) { // User must be logged in to see categories (even public ones, due to profile needs)
                 console.log("loadCategories called without current user, redirecting to login.");
                 showView('login'); return;
             }
-            showView('loading');
-            updateBreadcrumbs([]);
+            showView('loading'); // Show loading indicator
+            updateBreadcrumbs([]); // Reset breadcrumbs to "Home"
             
             categoriesList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando categorias...</p>';
-            const q = query(categoriesCol); 
+            const q = query(categoriesCol); // Get all categories (will be sorted client-side by last activity)
             
-            if (unsubscribeCategories) unsubscribeCategories(); 
+            if (unsubscribeCategories) unsubscribeCategories(); // Clear previous listener
             unsubscribeCategories = onSnapshot(q, async (snapshot) => {
-                if (!currentUser) return; 
+                if (!currentUser) return; // If user logs out while listener is active
                 
                 const categoriesToShow = [];
                 if (snapshot.empty) {
@@ -1240,35 +1433,38 @@
                     return;
                 }
 
+                // Filter categories based on user's role and category's allowedRoles
                 snapshot.docs.forEach(doc => {
                     const category = doc.data();
-                    category.id = doc.id; 
-                    if (isAdmin) {
+                    category.id = doc.id; // Add document ID to the category object
+                    if (isAdmin) { // Admins see all categories
                         categoriesToShow.push(category);
                     } else {
                         const allowed = category.allowedRoles;
+                        // If no roles specified (public) or user's role is in allowedRoles
                         if (!allowed || allowed.length === 0 || (userProfileData && allowed.includes(userProfileData.role))) {
                             categoriesToShow.push(category);
                         }
                     }
                 });
 
-                if (categoriesToShow.length === 0 && !isAdmin) { 
+                if (categoriesToShow.length === 0 && !isAdmin) { // No categories visible to this non-admin user
                      categoriesList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhuma categoria disponível para seu cargo.</div>';
                      showView('forumHome');
                      return;
                 }
 
 
+                // Fetch user profiles for 'lastActivityDetails.userDisplayName' and 'createdBy' for display names
                 const userIdsForLastActivity = new Set();
                 categoriesToShow.forEach(cat => {
                     const activityUserId = cat.lastActivityDetails?.userId;
                     if (activityUserId) userIdsForLastActivity.add(activityUserId);
-                    const createdById = cat.createdBy; 
+                    const createdById = cat.createdBy; // Also fetch creator for initial display if no activity
                     if (createdById) userIdsForLastActivity.add(createdById);
                 });
 
-                const activityUserProfiles = {};
+                const activityUserProfiles = {}; // Cache for fetched profiles
                 if (userIdsForLastActivity.size > 0) {
                     const profilePromises = Array.from(userIdsForLastActivity).map(uid => getDoc(doc(userProfilesCol, uid)));
                     try {
@@ -1276,6 +1472,7 @@
                         profileSnaps.forEach(snap => {
                             if (snap.exists()) {
                                 const data = snap.data();
+                                // Prefer nickname, then displayName, then part of email
                                 activityUserProfiles[snap.id] = data.nickname || data.displayName || data.email?.split('@')[0] || 'Desconhecido';
                             } else {
                                 activityUserProfiles[snap.id] = 'Usuário Deletado';
@@ -1283,13 +1480,15 @@
                         });
                     } catch (err) {
                         console.error("Error fetching user profiles for category last activity:", err);
+                        // UI will show default "Desconhecido" or stored display name if profiles fail to load
                     }
                 }
 
+                // Sort categories by last activity timestamp (descending)
                 const sortedCategories = categoriesToShow.sort((a, b) => {
                     const timeA = a.lastActivityDetails?.timestamp?.seconds || a.createdAt?.seconds || 0;
                     const timeB = b.lastActivityDetails?.timestamp?.seconds || b.createdAt?.seconds || 0;
-                    return timeB - timeA; 
+                    return timeB - timeA; // Most recent first
                 }); 
 
                 let categoriesHtml = '';
@@ -1297,12 +1496,12 @@
                     const lastActivity = category.lastActivityDetails;
                     let lastActivityHtml = 'Nenhuma atividade recente.';
                     if (lastActivity && lastActivity.topicId && lastActivity.topicTitle !== "Nenhum tópico ainda") {
-                        const userName = activityUserProfiles[lastActivity.userId] || 'Desconhecido';
+                        const userName = activityUserProfiles[lastActivity.userId] || lastActivity.userDisplayName || 'Desconhecido';
                         lastActivityHtml = `
                             Último: <a href="#" class="text-blue-400 hover:underline" data-topic-id-link="${lastActivity.topicId}" data-topic-title-link="${lastActivity.topicTitle}" data-category-id-for-topic="${category.id}" data-category-name-for-topic="${category.name}">${lastActivity.topicTitle}</a><br>
                             por ${userName}, ${formatTimestamp(lastActivity.timestamp)}
                         `;
-                    } else if (lastActivity && lastActivity.userDisplayName) { 
+                    } else if (lastActivity && lastActivity.userDisplayName) { // Fallback if no topic but creation activity
                          lastActivityHtml = `Criada por ${activityUserProfiles[lastActivity.userId] || lastActivity.userDisplayName}, ${formatTimestamp(lastActivity.timestamp)}`;
                     }
 
@@ -1326,39 +1525,43 @@
                     `;
                 });
                 categoriesList.innerHTML = categoriesHtml;
+                // Add event listeners for links within the generated HTML (e.g., last activity topic link)
                 categoriesList.querySelectorAll('a[data-topic-id-link]').forEach(link => {
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
-                        e.stopPropagation(); 
+                        e.stopPropagation(); // Prevent category link click if clicking on last activity
                         const topicId = e.target.dataset.topicIdLink;
                         const topicTitle = e.target.dataset.topicTitleLink;
-                        currentCategoryId = e.target.dataset.categoryIdForTopic; 
+                        currentCategoryId = e.target.dataset.categoryIdForTopic; // Set context for breadcrumbs
                         currentCategoryName = e.target.dataset.categoryNameForTopic;
-                        loadPosts(topicId, topicTitle);
+                        loadPosts(topicId, topicTitle); // Navigate to topic view
                     });
                 });
 
-                showView('forumHome');
+                showView('forumHome'); // Show the view after content is ready
             }, (error) => {
                 console.error("Error loading categories:", error);
-                 if (currentUser && categoriesList) { 
+                 if (currentUser && categoriesList) { // Only show error in UI if user is logged in
                     categoriesList.innerHTML = '<div class="p-6 text-center text-red-400 bg-gray-800 rounded-lg shadow">Erro ao carregar categorias. Verifique as permissões do Firestore e a conexão.</div>';
                     showModal("Erro ao carregar categorias: " + error.message + ". Verifique as permissões do Firestore.");
                  }
-                showView('forumHome');
+                showView('forumHome'); // Still show home view, but with error message
             });
         }
         
+        /**
+         * Handles clicks within the categories list (e.g., to delete a category or navigate to it).
+         */
         function handleCategoryListClick(e) {
-            if (e.target.classList.contains('delete-category-btn')) {
-                e.stopPropagation(); 
+            if (e.target.classList.contains('delete-category-btn')) { // Clicked delete button
+                e.stopPropagation(); // Prevent navigation if clicking delete
                 const categoryId = e.target.dataset.id;
                 const categoryName = e.target.dataset.name;
-                confirmAction(`Tem certeza que deseja excluir a categoria "${categoryName}" e todos os seus tópicos e posts?`, async () => {
+                confirmAction(`Tem certeza que deseja excluir a categoria "${categoryName}" e todos os seus tópicos e posts? Esta ação é irreversível.`, async () => {
                     if (!db) { showModal("Serviço de banco de dados indisponível."); return; }
                     await deleteCategory(categoryId);
                 });
-            } else {
+            } else { // Clicked on category link/area
                 const categoryLink = e.target.closest('.category-link');
                 if (categoryLink && categoryLink.dataset.id) { 
                      loadTopics(categoryLink.dataset.id, categoryLink.dataset.name);
@@ -1366,12 +1569,17 @@
             }
         }
 
+        /**
+         * Deletes a category and all its associated topics and posts.
+         * @param {string} categoryId - The ID of the category to delete.
+         */
         async function deleteCategory(categoryId) {
             if (!hasPermission(PERMISSIONS.MANAGE_CATEGORIES)) {
                  showModal("Você não tem permissão para deletar categorias.", "error"); return;
             }
-            showModal("Excluindo categoria...", "info");
+            showModal("Excluindo categoria... Isso pode levar um momento.", "info"); // Inform user
             try {
+                // 1. Delete all posts in all topics of this category
                 const topicsInCatQuery = query(topicsCol, where("categoryId", "==", categoryId));
                 const topicsInCatSnapshot = await getDocs(topicsInCatQuery);
                 for (const topicDoc of topicsInCatSnapshot.docs) {
@@ -1380,36 +1588,48 @@
                     for (const postDoc of postsInTopicSnapshot.docs) {
                         await deleteDoc(doc(postsCol, postDoc.id));
                     }
+                    // 2. Delete the topic itself
                     await deleteDoc(doc(topicsCol, topicDoc.id));
                 }
+                // 3. Delete the category
                 await deleteDoc(doc(categoriesCol, categoryId));
                 showModal("Categoria excluída com sucesso!", "success");
+                // The categories list will update via its onSnapshot listener.
             } catch (error) {
                 console.error("Error deleting category:", error);
                 showModal("Erro ao excluir categoria: " + error.message, "error");
             }
         }
 
-        let currentCategoryName = '';
-        let currentCategoryId = null;
-        let currentCategoryAllowedRoles = []; 
+        // --- Topic Management ---
+        let currentCategoryName = ''; // Name of the current category being viewed
+        let currentCategoryId = null; // ID of the current category
+        let currentCategoryAllowedRoles = []; // Roles allowed for the current category (for topic creation defaults)
 
+        /**
+         * Opens the "Create New Topic" modal.
+         */
         function openCreateTopicModal() {
             if (!hasPermission(PERMISSIONS.CREATE_TOPIC)) {
                  showModal("Você não tem permissão para criar tópicos.", "error"); return;
             }
-            if (!currentCategoryId) {
+            if (!currentCategoryId) { // Must be in a category to create a topic
                 showModal("Selecione uma categoria antes de criar um tópico.", "error"); return;
             }
+            // Reset form fields
             if (newTopicTitleInput) newTopicTitleInput.value = ''; 
             if (newTopicContentInput) newTopicContentInput.value = ''; 
             if (newTopicCommandInput) newTopicCommandInput.value = '';
-            populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer, currentCategoryAllowedRoles); // Populate with category's roles as default
+            // Populate role permission checkboxes, defaulting to category's roles
+            populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer, currentCategoryAllowedRoles); 
             
             const createTopicModal = document.getElementById('create-topic-modal');
             if(createTopicModal) createTopicModal.style.display = 'flex';
         }
         
+        /**
+         * Handles the creation of a new topic and its first post.
+         */
         async function handleCreateTopic(e) {
             e.preventDefault();
             if (!hasPermission(PERMISSIONS.CREATE_TOPIC)) {
@@ -1421,14 +1641,14 @@
             }
             const title = newTopicTitleInput.value.trim(); 
             const content = newTopicContentInput.value.trim(); 
-            const commandToCopy = newTopicCommandInput.value.trim();
+            const commandToCopy = newTopicCommandInput.value.trim(); // Optional command
             
             if (!title || !content) {
                 showModal("Título e conteúdo do primeiro post são obrigatórios.");
                 return;
             }
 
-            const selectedTopicRoles = [];
+            const selectedTopicRoles = []; // Roles allowed to view this specific topic
             const topicRoleCheckboxes = document.querySelectorAll('#topic-role-permissions-container input[name="topicAllowedRoles"]:checked');
             topicRoleCheckboxes.forEach(checkbox => selectedTopicRoles.push(checkbox.value));
 
@@ -1437,34 +1657,37 @@
             const userDisplayName = userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0];
             
             try {
+                // 1. Create the topic document
                 const topicRef = await addDoc(topicsCol, {
                     categoryId: currentCategoryId,
                     title,
                     createdBy: currentUserId,
-                    userDisplayName: userDisplayName, 
+                    userDisplayName: userDisplayName, // Store initial display name
                     createdAt: now,
-                    replyCount: 0, 
-                    postCount: 1, 
-                    lastReplyAt: now,
+                    replyCount: 0, // Starts with 0 replies (first post is not a reply)
+                    postCount: 1, // Starts with 1 post (the initial post)
+                    lastReplyAt: now, // Timestamp of the last activity (initial post)
                     lastReplyBy: currentUserId,
                     lastReplyByDisplayName: userDisplayName,
                     viewCount: 0,
-                    allowedRoles: selectedTopicRoles.length > 0 ? selectedTopicRoles : [] // Store empty if none, to inherit from category or be public
+                    allowedRoles: selectedTopicRoles.length > 0 ? selectedTopicRoles : [] // Empty means inherit/public
                 });
 
+                // 2. Create the first post for this topic
                 await addDoc(postsCol, {
                     topicId: topicRef.id,
                     userId: currentUserId,
                     userDisplayName: userDisplayName,
                     content,
                     createdAt: now,
-                    commandToCopy: commandToCopy || null 
+                    commandToCopy: commandToCopy || null // Store command if provided
                 });
                 
+                // 3. Update category metadata (topic count, post count, last activity)
                 const categoryRef = doc(categoriesCol, currentCategoryId);
                 await updateDoc(categoryRef, {
                     topicCount: increment(1),
-                    postCount: increment(1), 
+                    postCount: increment(1), // Also increment category's total post count
                     lastActivity: now, 
                     lastActivityDetails: {
                         topicId: topicRef.id,
@@ -1478,6 +1701,7 @@
                 showModal("Tópico criado com sucesso!", "success");
                 if (document.getElementById('create-topic-form-modal')) document.getElementById('create-topic-form-modal').reset(); 
                 if (document.getElementById('create-topic-modal')) document.getElementById('create-topic-modal').style.display = 'none';
+                // The topics list will update via its onSnapshot listener.
             } catch (error) {
                 console.error("Error creating topic:", error);
                 showModal("Erro ao criar tópico: " + error.message);
@@ -1485,6 +1709,11 @@
         }
 
 
+        /**
+         * Loads and displays topics for a given category.
+         * @param {string} categoryId - The ID of the category.
+         * @param {string} categoryName - The name of the category (for display).
+         */
         async function loadTopics(categoryId, categoryName) {
             if (!db || !topicsCol || !userProfilesCol || !topicsList || !categoryTitle) { 
                 if(topicsList) topicsList.innerHTML = '<div class="p-4 text-center text-red-400">Erro: Serviço de banco de dados indisponível.</div>';
@@ -1492,26 +1721,28 @@
                 return; 
             }
             if (!currentUser || !userProfileData) { // Ensure userProfileData is available for role checks
-                 console.log("loadTopics: currentUser or userProfileData not available.");
+                 console.log("loadTopics: currentUser or userProfileData not available. Redirecting to login.");
                  showView('login'); return; 
             }
 
             showView('loading');
-            currentCategoryId = categoryId;
+            currentCategoryId = categoryId; // Set global context
             currentCategoryName = categoryName;
-            categoryTitle.textContent = categoryName;
+            categoryTitle.textContent = categoryName; // Display category name in view
             updateBreadcrumbs([{name: categoryName, view: 'category', id: categoryId}]);
 
+            // Fetch category details to get its allowedRoles (for topic creation defaults and permission checks)
             const categoryRef = doc(categoriesCol, categoryId);
             const categorySnap = await getDoc(categoryRef);
             if (!categorySnap.exists()) {
                 showModal("Categoria não encontrada.", "error");
-                showView('forumHome');
+                showView('forumHome'); // Go back if category doesn't exist
                 return;
             }
             const categoryData = categorySnap.data();
-            currentCategoryAllowedRoles = categoryData.allowedRoles || []; 
+            currentCategoryAllowedRoles = categoryData.allowedRoles || []; // Store for "Create Topic" modal
 
+            // Check if user can view this category (redundant if navigated from categories list, but good for direct links)
             if (!isAdmin && currentCategoryAllowedRoles.length > 0 && !currentCategoryAllowedRoles.includes(userProfileData.role)) {
                 topicsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Você não tem permissão para ver os tópicos desta categoria.</div>';
                 showView('category');
@@ -1519,27 +1750,27 @@
             }
             
             topicsList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando tópicos...</p>';
-            const q = query(topicsCol, where("categoryId", "==", categoryId)); 
+            const q = query(topicsCol, where("categoryId", "==", categoryId)); // Get topics for this category
             
-            if (unsubscribeTopics) unsubscribeTopics();
+            if (unsubscribeTopics) unsubscribeTopics(); // Clear previous listener
             unsubscribeTopics = onSnapshot(q, async (snapshot) => {
-                if (!currentUser || !userProfileData) return; // Check again inside snapshot
+                if (!currentUser || !userProfileData) return; // Check again inside snapshot for safety
                 
                 const topicsToShow = [];
                 snapshot.docs.forEach(doc => {
                     const topic = doc.data();
                     topic.id = doc.id;
                     let canViewThisTopic = false;
-                    if (isAdmin) {
+                    if (isAdmin) { // Admins see all
                         canViewThisTopic = true;
                     } else {
                         const topicRoles = topic.allowedRoles;
-                        if (topicRoles && topicRoles.length > 0) { // Topic has specific roles
+                        if (topicRoles && topicRoles.length > 0) { // Topic has its own specific roles
                             if (topicRoles.includes(userProfileData.role)) {
                                 canViewThisTopic = true;
                             }
-                        } else { // Topic inherits from category (which we've already checked)
-                            canViewThisTopic = true; // If category check passed, and topic has no specific roles, it's viewable
+                        } else { // Topic inherits from category (which we've already checked access for)
+                            canViewThisTopic = true; 
                         }
                     }
                     if(canViewThisTopic) topicsToShow.push(topic);
@@ -1552,13 +1783,14 @@
                 }
 
 
+                // Fetch user profiles for createdBy and lastReplyBy display names
                 const userIds = new Set();
                 topicsToShow.forEach(topic => {
                     if(topic.createdBy) userIds.add(topic.createdBy);
                     if(topic.lastReplyBy) userIds.add(topic.lastReplyBy);
                 });
 
-                const profiles = {};
+                const profiles = {}; // Cache for fetched profiles
                 if (userIds.size > 0) {
                     const profilePromises = Array.from(userIds).map(uid => getDoc(doc(userProfilesCol, uid)));
                      try {
@@ -1568,7 +1800,7 @@
                                 const data = snap.data();
                                 profiles[snap.id] = {
                                     displayName: data.nickname || data.displayName || data.email?.split('@')[0] || 'Desconhecido',
-                                    role: data.role || 'Membro' 
+                                    role: data.role || 'Membro' // Also get role for potential display later
                                 };
                             } else {
                                 profiles[snap.id] = { displayName: 'Usuário Deletado', role: 'Membro' };
@@ -1577,10 +1809,11 @@
                     } catch (err) { console.error("Error fetching user profiles for topics:", err); }
                 }
                 
+                // Sort topics by last reply time (descending)
                 const sortedDocs = topicsToShow.sort((a,b) => { 
                     const timeA = a.lastReplyAt?.seconds || a.createdAt?.seconds || 0;
                     const timeB = b.lastReplyAt?.seconds || b.createdAt?.seconds || 0;
-                    return timeB - timeA;
+                    return timeB - timeA; // Most recent first
                 });
 
                 let topicsHtml = '';
@@ -1588,13 +1821,17 @@
                     const createdByDisplayName = profiles[topic.createdBy]?.displayName || topic.userDisplayName || 'Desconhecido';
                     const lastReplyByDisplayName = profiles[topic.lastReplyBy]?.displayName || topic.lastReplyByDisplayName || 'N/A';
                     
+                    // Actions: Edit (pencil icon), Delete
                     let topicActionsHtml = '';
+                    // Edit: Topic creator OR user with MANAGE_CATEGORIES (as a proxy for "manage any topic")
                     if (currentUser.uid === topic.createdBy || hasPermission(PERMISSIONS.MANAGE_CATEGORIES) ) {
                          topicActionsHtml += `<svg class="edit-topic-btn-icon w-4 h-4 inline-block" data-topic-id="${topic.id}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>`;
                     }
+                    // Delete: User with DELETE_ANY_TOPIC OR (user with DELETE_OWN_TOPIC AND is creator)
                     if (hasPermission(PERMISSIONS.DELETE_ANY_TOPIC) || (hasPermission(PERMISSIONS.DELETE_OWN_TOPIC) && currentUser.uid === topic.createdBy)) {
                         topicActionsHtml += `<button class="delete-topic-btn text-red-500 hover:text-red-400 text-xs ml-2 self-start p-1" data-id="${topic.id}" data-title="${topic.title}">Excluir</button>`;
                     }
+                    // Display privacy info (public, private inherited, or private specific to topic)
                     const topicPrivacyInfo = (topic.allowedRoles && topic.allowedRoles.length > 0) 
                         ? `<p class="text-xs text-yellow-400 mt-1">Privado para: ${topic.allowedRoles.join(', ')}</p>` 
                         : (currentCategoryAllowedRoles.length > 0 ? `<p class="text-xs text-yellow-400 mt-1">Privado (herdado da categoria)</p>` : `<p class="text-xs text-green-400 mt-1">Público</p>`);
@@ -1623,49 +1860,52 @@
                     `;
                 });
                 topicsList.innerHTML = topicsHtml;
-                addProfileLinkListeners(topicsList);
-                // Add event listeners for edit topic buttons
+                addProfileLinkListeners(topicsList); // Attach listeners for user profile links
+                // Add event listeners for edit topic buttons (pencil icons)
                 topicsList.querySelectorAll('.edit-topic-btn-icon').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
-                        e.stopPropagation(); // Prevent topic navigation
+                        e.stopPropagation(); // Prevent topic navigation when clicking icon
                         const topicId = e.target.closest('.edit-topic-btn-icon').dataset.topicId;
                         const topicRef = doc(topicsCol, topicId);
                         const topicSnap = await getDoc(topicRef);
                         if (topicSnap.exists()) {
-                            openEditTopicModal(topicId, topicSnap.data());
+                            openEditTopicModal(topicId, topicSnap.data()); // Open modal with topic data
                         } else {
                             showModal("Tópico não encontrado para editar.", "error");
                         }
                     });
                 });
-                showView('category');
+                showView('category'); // Show the view after content is ready
             }, (error) => {
                 console.error("Error loading topics:", error);
-                if(currentUser && topicsList) {
+                if(currentUser && topicsList) { // Only show error in UI if user is logged in
                     topicsList.innerHTML = '<div class="p-6 text-center text-red-400 bg-gray-800 rounded-lg shadow">Erro ao carregar tópicos.</div>';
                     showModal("Erro ao carregar tópicos: " + error.message);
                 }
-                showView('category');
+                showView('category'); // Still show category view, but with error
             });
         }
 
+        /**
+         * Handles clicks within the topics list (e.g., to delete, edit, or navigate to a topic).
+         */
         async function handleTopicListClick(e) {
             const target = e.target;
-            if (target.classList.contains('delete-topic-btn')) {
-                 e.stopPropagation();
+            if (target.classList.contains('delete-topic-btn')) { // Clicked delete button
+                 e.stopPropagation(); // Prevent navigation
                  const topicId = target.dataset.id;
                  const topicTitle = target.dataset.title;
-                 confirmAction(`Tem certeza que deseja excluir o tópico "${topicTitle}" e todos os seus posts?`, async () => {
+                 confirmAction(`Tem certeza que deseja excluir o tópico "${topicTitle}" e todos os seus posts? Esta ação é irreversível.`, async () => {
                     if (!db) { showModal("Serviço de banco de dados indisponível."); return; }
                     await deleteTopic(topicId);
                 });
-            } else if (target.classList.contains('user-profile-link')) {
+            } else if (target.classList.contains('user-profile-link')) { // Clicked user profile link
                 e.preventDefault();
                 e.stopPropagation();
                 const userIdToShow = target.dataset.userid;
                 if (userIdToShow) showView('userProfile', { userId: userIdToShow });
-            } else if (target.closest('.edit-topic-btn-icon')) { // Click on SVG or its path
-                e.stopPropagation();
+            } else if (target.closest('.edit-topic-btn-icon')) { // Clicked edit icon (SVG or its path)
+                e.stopPropagation(); // Prevent navigation
                 const topicId = target.closest('.edit-topic-btn-icon').dataset.topicId;
                 const topicRef = doc(topicsCol, topicId);
                 const topicSnap = await getDoc(topicRef);
@@ -1674,23 +1914,28 @@
                 } else {
                     showModal("Tópico não encontrado para editar.", "error");
                 }
-            } else {
+            } else { // Clicked on topic title or container to navigate
                 const topicLink = target.closest('.topic-link-container')?.querySelector('.topic-title-link');
                 if (topicLink && topicLink.dataset.id) {
                     const topicId = topicLink.dataset.id;
                     const topicTitle = topicLink.dataset.title;
                     
+                    // Increment view count (best effort, don't block navigation for this)
                     const topicRef = doc(topicsCol, topicId);
                     try { 
                         await updateDoc(topicRef, { viewCount: increment(1) });
                     } catch (viewError) {
                         console.warn("Could not update view count:", viewError.message); 
                     }
-                    loadPosts(topicId, topicTitle);
+                    loadPosts(topicId, topicTitle); // Navigate to topic view
                 }
             }
         }
 
+        /**
+         * Deletes a topic and all its posts.
+         * @param {string} topicId - The ID of the topic to delete.
+         */
         async function deleteTopic(topicId) {
             const topicRef = doc(topicsCol, topicId);
             const topicSnap = await getDoc(topicRef);
@@ -1698,12 +1943,14 @@
                 showModal("Tópico não encontrado.", "error"); return;
             }
             const topicData = topicSnap.data();
+            // Permission check: DELETE_ANY_TOPIC or (DELETE_OWN_TOPIC and is creator)
             if (!hasPermission(PERMISSIONS.DELETE_ANY_TOPIC) && !(hasPermission(PERMISSIONS.DELETE_OWN_TOPIC) && currentUser.uid === topicData.createdBy)) {
                 showModal("Você não tem permissão para excluir este tópico.", "error"); return;
             }
 
-            showModal("Excluindo tópico e seus posts...", "info");
+            showModal("Excluindo tópico e seus posts... Isso pode levar um momento.", "info");
             try {
+                // 1. Delete all posts in this topic
                 const postsInTopicQuery = query(postsCol, where("topicId", "==", topicId));
                 const postsSnapshot = await getDocs(postsInTopicQuery);
                 let postsDeletedCount = 0;
@@ -1711,43 +1958,55 @@
                     await deleteDoc(doc(postsCol, postDoc.id));
                     postsDeletedCount++;
                 }
+                // 2. Delete the topic itself
                 await deleteDoc(topicRef);
 
+                // 3. Update category metadata (decrement counts)
                 if (topicData.categoryId) { 
                     const categoryRef = doc(categoriesCol, topicData.categoryId); 
                     const categorySnap = await getDoc(categoryRef);
                     if (categorySnap.exists()) {
-                        const categoryData = categorySnap.data();
+                        const currentCategoryData = categorySnap.data();
                         let updateData = {
                             topicCount: increment(-1),
-                            postCount: increment(-postsDeletedCount)
+                            postCount: increment(-postsDeletedCount) // Decrement by actual number of posts deleted
                         };
-                        if (categoryData.lastActivityDetails && categoryData.lastActivityDetails.topicId === topicId) {
+                        // If the deleted topic was the last active one, the category's lastActivityDetails
+                        // might become stale. It will naturally update when new activity occurs.
+                        // For simplicity, we don't try to find the "new" last active topic here.
+                        if (currentCategoryData.lastActivityDetails && currentCategoryData.lastActivityDetails.topicId === topicId) {
                             console.log("Deleted topic was last active in category. LastActivityDetails might be stale until new activity.");
+                            // Optionally, could try to find the next most recent topic and update lastActivityDetails,
+                            // but this adds complexity. For now, let it update on next real activity.
                         }
                         await updateDoc(categoryRef, updateData);
                     }
                 }
                 showModal("Tópico excluído com sucesso!", "success");
+                // Topic list will refresh via its onSnapshot listener.
             } catch (error) {
                 console.error("Error deleting topic:", error);
                 showModal("Erro ao excluir tópico: " + error.message, "error");
             }
         }
 
-        let currentTopicId = null;
-        let currentTopicTitle = '';
+        // --- Post Management ---
+        let currentTopicId = null; // ID of the current topic being viewed
+        let currentTopicTitle = ''; // Title of the current topic (for breadcrumbs, etc.)
 
+        /**
+         * Handles the creation of a new post in a topic.
+         */
         async function handleCreatePost(e) {
             e.preventDefault();
             if (!hasPermission(PERMISSIONS.CREATE_POST)) {
                  showModal("Você não tem permissão para criar posts.", "error"); return;
             }
-            if (!currentUser || !currentTopicId) {
+            if (!currentUser || !currentTopicId) { // Must be logged in and in a topic
                 showModal("Você precisa estar logado e em um tópico para postar.");
                 return;
             }
-            const content = e.target.content.value.trim();
+            const content = e.target.content.value.trim(); // Get content from textarea
             if (!content) {
                 showModal("O conteúdo da postagem não pode estar vazio.");
                 return;
@@ -1757,31 +2016,34 @@
             const userDisplayName = userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0];
 
             try {
+                // 1. Create the post document
                 await addDoc(postsCol, {
                     topicId: currentTopicId,
                     userId: currentUserId,
-                    userDisplayName: userDisplayName, 
+                    userDisplayName: userDisplayName, // Store display name at time of posting
                     content,
                     createdAt: now
                 });
 
+                // 2. Update topic metadata (reply count, post count, last reply info)
                 const topicRef = doc(topicsCol, currentTopicId);
                 await updateDoc(topicRef, {
                     replyCount: increment(1),
-                    postCount: increment(1), 
+                    postCount: increment(1), // Also increment topic's total post count
                     lastReplyAt: now,
                     lastReplyBy: currentUserId,
                     lastReplyByDisplayName: userDisplayName
                 });
                 
-                if(currentCategoryId) { 
+                // 3. Update category metadata (post count, last activity info)
+                if(currentCategoryId) { // Ensure category context is available
                     const categoryRef = doc(categoriesCol, currentCategoryId); 
                     await updateDoc(categoryRef, {
-                        postCount: increment(1), 
+                        postCount: increment(1), // Increment category's total post count
                         lastActivity: now,
                         lastActivityDetails: {
                             topicId: currentTopicId,
-                            topicTitle: currentTopicTitle, 
+                            topicTitle: currentTopicTitle, // Use the globally set currentTopicTitle
                             userId: currentUserId,
                             userDisplayName: userDisplayName,
                             timestamp: now
@@ -1789,63 +2051,74 @@
                     });
                 }
                 showModal("Postagem criada com sucesso!", "success");
-                e.target.reset();
+                e.target.reset(); // Clear the post content textarea
+                // The posts list will update via its onSnapshot listener.
             } catch (error) {
                 console.error("Error creating post:", error);
                 showModal("Erro ao criar postagem: " + error.message);
             }
         }
 
+        /**
+         * Loads and displays posts for a given topic.
+         * @param {string} topicId - The ID of the topic.
+         * @param {string} topicTitleFromLink - The title of the topic (can be from link, DB is source of truth).
+         */
         async function loadPosts(topicId, topicTitleFromLink) {
             if (!db || !postsCol || !userProfilesCol || !topicsCol || !postsList || !topicTitleFull) { 
                 if(postsList) postsList.innerHTML = '<div class="p-4 text-center text-red-400">Erro: Serviço de banco de dados indisponível.</div>';
                 showView('topic');
                 return; 
             }
-            if (!currentUser || !userProfileData) { showView('login'); return; } // Ensure profile data for permission checks
+            if (!currentUser || !userProfileData) { showView('login'); return; } // User must be logged in
 
             showView('loading');
-            currentTopicId = topicId; // Set for creating new posts
+            currentTopicId = topicId; // Set global context for creating new posts
             
+            // Fetch the topic document to get the definitive title and its permissions
             const topicRef = doc(topicsCol, topicId);
             const topicSnap = await getDoc(topicRef);
 
             if (!topicSnap.exists()) {
                 showModal("Tópico não encontrado.", "error");
-                showView('category'); 
+                // Try to go back to category if context exists, otherwise forum home
+                showView(currentCategoryId ? 'category' : 'forumHome'); 
                 return;
             }
             const topicData = topicSnap.data();
-            currentTopicTitle = topicData.title; // Use title from DB for consistency
-            topicTitleFull.textContent = currentTopicTitle;
+            currentTopicTitle = topicData.title; // Use title from DB as the source of truth
+            topicTitleFull.textContent = currentTopicTitle; // Display topic title in view
 
 
-            // Permission check for the topic itself
+            // --- Permission check for viewing this specific topic ---
             let canViewThisTopic = false;
-            if (isAdmin) {
+            if (isAdmin) { // Admins can view all topics
                 canViewThisTopic = true;
             } else {
                 const topicSpecificRoles = topicData.allowedRoles;
-                if (topicSpecificRoles && topicSpecificRoles.length > 0) {
+                if (topicSpecificRoles && topicSpecificRoles.length > 0) { // Topic has its own role restrictions
                     if (userProfileData && topicSpecificRoles.includes(userProfileData.role)) {
                         canViewThisTopic = true;
                     }
-                } else { // Topic inherits from category
-                    // currentCategoryAllowedRoles should have been set when navigating to the category
-                    // If navigating directly, fetch category to get its roles
-                    let categoryAllowedRolesForTopic = currentCategoryAllowedRoles; // Use if already set
+                } else { // Topic inherits permissions from its category
+                    let categoryAllowedRolesForTopic = currentCategoryAllowedRoles; // Use if already set from category view
+                    // If navigating directly to topic (e.g. via link), category context might not be set
+                    // So, fetch parent category to check its roles
                     if (topicData.categoryId && (!currentCategoryId || currentCategoryId !== topicData.categoryId)) {
                         const parentCategoryRef = doc(categoriesCol, topicData.categoryId);
                         const parentCategorySnap = await getDoc(parentCategoryRef);
                         if (parentCategorySnap.exists()) {
                             categoryAllowedRolesForTopic = parentCategorySnap.data().allowedRoles || [];
-                            currentCategoryName = parentCategorySnap.data().name; // Update breadcrumb info
+                            // Update global category context for breadcrumbs if it was missing/different
+                            currentCategoryName = parentCategorySnap.data().name; 
                             currentCategoryId = topicData.categoryId;
                         } else {
-                             categoryAllowedRolesForTopic = []; // Category not found, assume restricted
+                             categoryAllowedRolesForTopic = []; // Category not found, assume restricted by default
+                             console.warn(`Parent category ${topicData.categoryId} for topic ${topicId} not found.`);
                         }
                     }
                     
+                    // If category is public OR user's role is allowed by category
                     if (categoryAllowedRolesForTopic.length === 0 || (userProfileData && categoryAllowedRolesForTopic.includes(userProfileData.role))) {
                         canViewThisTopic = true;
                     }
@@ -1854,34 +2127,37 @@
 
             if (!canViewThisTopic) {
                 showModal("Você não tem permissão para visualizar este tópico.", "error");
-                showView(currentCategoryId ? 'category' : 'forumHome'); // Go back to category or home
+                showView(currentCategoryId ? 'category' : 'forumHome'); // Go back
                 return;
             }
             
-            // Update breadcrumbs after confirming category details
+            // Update breadcrumbs now that category context is confirmed/fetched
             updateBreadcrumbs([
                 {name: currentCategoryName || "Categoria", view: 'category', id: currentCategoryId}, 
-                {name: currentTopicTitle, view: 'topic', id: topicId}
+                {name: currentTopicTitle, view: 'topic', id: topicId} // This 'topic' view in breadcrumb is conceptual
             ]);
 
 
+            // Clear any previous poll (if polls were implemented)
             if (document.getElementById('topic-poll-container')) document.getElementById('topic-poll-container').innerHTML = ''; 
 
             postsList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando postagens...</p>';
-            const q = query(postsCol, where("topicId", "==", topicId)); 
+            const q = query(postsCol, where("topicId", "==", topicId)); // Get posts for this topic
+            // Posts will be sorted client-side by createdAt
 
-            if(unsubscribePosts) unsubscribePosts();
+            if(unsubscribePosts) unsubscribePosts(); // Clear previous listener
             unsubscribePosts = onSnapshot(q, async (snapshot) => {
-                if (!currentUser) return;
+                if (!currentUser) return; // If user logs out
                 if (snapshot.empty) {
-                    // Topic exists (checked above), so it's just empty of posts
+                    // Topic exists (checked above), so it's just empty of posts (e.g., first post deleted)
                     postsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhuma postagem encontrada neste tópico. Seja o primeiro a responder!</div>';
                     showView('topic');
                     return;
                 }
 
-                const userIds = new Set(snapshot.docs.map(d => d.data().userId).filter(id => id));
-                const profiles = {};
+                // Fetch user profiles for post authors
+                const userIds = new Set(snapshot.docs.map(d => d.data().userId).filter(id => id)); // Filter out undefined IDs
+                const profiles = {}; // Cache for fetched profiles
                  if (userIds.size > 0) {
                     const profilePromises = Array.from(userIds).map(uid => getDoc(doc(userProfilesCol, uid)));
                      try {
@@ -1891,40 +2167,45 @@
                                 const data = snap.data();
                                 profiles[snap.id] = {
                                     displayName: data.nickname || data.displayName || data.email?.split('@')[0] || 'Desconhecido',
-                                    role: data.role || 'Membro'
+                                    role: data.role || 'Membro' // Get role for styling
                                 };
-                            } else {
+                            } else { // Should not happen if users can't be deleted, but good practice
                                 profiles[snap.id] = { displayName: 'Usuário Deletado', role: 'Membro' };
                             }
                         });
                     } catch (err) { console.error("Error fetching user profiles for posts:", err); }
                 }
                 
+                // Sort posts by creation time (ascending)
                 const docsToSort = [...snapshot.docs];
                 const sortedDocs = docsToSort.sort((a,b) => {
                     const timeA = a.data().createdAt?.seconds || 0;
                     const timeB = b.data().createdAt?.seconds || 0;
-                    return timeA - timeB; 
+                    return timeA - timeB; // Oldest first
                 });
 
                 let postsHtml = '';
-                sortedDocs.forEach((postDoc, index) => { 
+                sortedDocs.forEach((postDoc, index) => { // Index for identifying first post (for command button)
                     const post = postDoc.data();
                     const userProfile = profiles[post.userId];
                     const displayName = userProfile?.displayName || post.userDisplayName || 'Desconhecido';
                     const userRole = userProfile?.role || 'Membro'; 
-                    const roleColor = currentRoleColors[userRole] || '#6b7280'; 
-                    const postContent = post.content ? post.content.replace(/\n/g, '<br>') : ""; 
+                    const roleColor = currentRoleColors[userRole] || '#6b7280'; // Default color if role/color not found
+                    const postContent = post.content ? post.content.replace(/\n/g, '<br>') : ""; // Preserve line breaks
 
+                    // Command button for the first post if commandToCopy exists
                     let commandButtonHtml = '';
                     if (index === 0 && post.commandToCopy) { 
                         commandButtonHtml = `<button class="copy-post-command-btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded-md mt-2" data-command="${post.commandToCopy}">Copiar Comando</button>`;
                     }
                     
+                    // Edit/Delete actions for posts
                     let actionsHtml = '';
+                    // Edit: User with EDIT_ANY_POST OR (user with EDIT_OWN_POST AND is author)
                     if (hasPermission(PERMISSIONS.EDIT_ANY_POST) || (hasPermission(PERMISSIONS.EDIT_OWN_POST) && currentUser.uid === post.userId)) {
                         actionsHtml += `<button class="edit-post-btn text-yellow-500 hover:text-yellow-400 text-xs mt-2 p-1 mr-2" data-post-id="${postDoc.id}">Editar</button>`;
                     }
+                    // Delete: User with DELETE_ANY_POST OR (user with DELETE_OWN_POST AND is author)
                     if (hasPermission(PERMISSIONS.DELETE_ANY_POST) || (hasPermission(PERMISSIONS.DELETE_OWN_POST) && currentUser.uid === post.userId)) { 
                          actionsHtml += `<button class="delete-post-btn text-red-500 hover:text-red-400 text-xs mt-2 p-1" data-id="${postDoc.id}" data-topic-id="${post.topicId}">Excluir</button>`;
                     }
@@ -1945,35 +2226,40 @@
                     `;
                 });
                 postsList.innerHTML = postsHtml;
-                addProfileLinkListeners(postsList);
+                addProfileLinkListeners(postsList); // Attach listeners for user profile links in posts
+                // Add listeners for "Copy Command" buttons
                 postsList.querySelectorAll('.copy-post-command-btn').forEach(button => {
                     button.addEventListener('click', (e) => copyToClipboard(e.target.dataset.command));
                 });
+                // Add listeners for "Edit Post" buttons
                 postsList.querySelectorAll('.edit-post-btn').forEach(button => {
                     button.addEventListener('click', async (e) => {
                         const postId = e.target.dataset.postId;
                         const postRef = doc(postsCol, postId);
                         const postSnap = await getDoc(postRef);
                         if (postSnap.exists()) {
-                            openEditPostModal(postId, postSnap.data().content);
+                            openEditPostModal(postId, postSnap.data().content); // Open modal with post content
                         } else {
                             showModal("Post não encontrado para editar.", "error");
                         }
                     });
                 });
-                showView('topic');
+                showView('topic'); // Show the view after content is ready
             }, (error) => {
                 console.error("Error loading posts:", error);
-                if (currentUser && postsList) {
+                if (currentUser && postsList) { // Only show error in UI if user is logged in
                     postsList.innerHTML = '<div class="p-6 text-center text-red-400 bg-gray-800 rounded-lg shadow">Erro ao carregar postagens.</div>';
                     showModal("Erro ao carregar postagens: " + error.message);
                 }
-                showView('topic');
+                showView('topic'); // Still show topic view, but with error
             });
         }
 
+        /**
+         * Handles clicks within the posts list (e.g., to delete a post or view a user profile).
+         */
         async function handlePostListClick(e) {
-            if (e.target.classList.contains('delete-post-btn')) {
+            if (e.target.classList.contains('delete-post-btn')) { // Clicked delete button
                 const postId = e.target.dataset.id;
                 const postRef = doc(postsCol, postId);
                 const postSnap = await getDoc(postRef); 
@@ -1981,40 +2267,51 @@
                     showModal("Post não encontrado.", "error"); return;
                 }
                 const postData = postSnap.data();
+                // Permission check for deleting post
                 if (!hasPermission(PERMISSIONS.DELETE_ANY_POST) && !(hasPermission(PERMISSIONS.DELETE_OWN_POST) && currentUser.uid === postData.userId)) {
                     showModal("Você não tem permissão para excluir este post.", "error"); return;
                 }
 
-                confirmAction("Tem certeza que deseja excluir este post?", async () => {
+                confirmAction("Tem certeza que deseja excluir este post? Esta ação é irreversível.", async () => {
                     try {
                         await deleteDoc(postRef); 
+                        // Update topic and category counts
                         if (postData.topicId) {
                             const topicRef = doc(topicsCol, postData.topicId);
                             await updateDoc(topicRef, { 
-                                replyCount: increment(-1),
+                                replyCount: increment(-1), // If it's a reply. First post deletion is more complex.
                                 postCount: increment(-1) 
+                                // TODO: Handle if first post is deleted (topic might need to be deleted or handled differently)
+                                // For now, assumes any post deletion decrements counts.
                             });
                         }
-                        if(currentCategoryId) { 
+                        if(currentCategoryId) { // If category context is known
                             const categoryRef = doc(categoriesCol, currentCategoryId);
                             await updateDoc(categoryRef, { postCount: increment(-1) });
                         }
                         showModal("Post excluído com sucesso!", "success");
+                        // Posts list will update via its onSnapshot listener.
                     } catch (error) {
                         console.error("Error deleting post:", error);
                         showModal("Erro ao excluir post: " + error.message, "error");
                     }
                 });
-            } else if (e.target.classList.contains('user-profile-link')) {
+            } else if (e.target.classList.contains('user-profile-link')) { // Clicked user profile link
                 e.preventDefault();
                 const userIdToShow = e.target.dataset.userid;
                 if (userIdToShow) showView('userProfile', { userId: userIdToShow });
             }
         }
         
+        /**
+         * Attaches event listeners to user profile links within a given parent element.
+         * Clones and replaces nodes to avoid issues with stale listeners.
+         * @param {HTMLElement} parentElement - The element containing user profile links.
+         */
         function addProfileLinkListeners(parentElement) {
             if (!parentElement) return;
             parentElement.querySelectorAll('.user-profile-link').forEach(link => {
+                // Clone and replace to ensure fresh event listeners, especially if content is re-rendered
                 const newLink = link.cloneNode(true);
                 link.parentNode.replaceChild(newLink, link);
 
@@ -2026,13 +2323,22 @@
             });
         }
 
+        // --- Edit Post Functionality ---
+        /**
+         * Opens the modal to edit a post.
+         * @param {string} postId - The ID of the post to edit.
+         * @param {string} currentContent - The current content of the post.
+         */
         function openEditPostModal(postId, currentContent) {
             if (!editPostModal || !editPostContentInput) return;
-            editingPostId = postId; // Ensure this is declared globally
-            editPostContentInput.value = currentContent; 
-            editPostModal.style.display = 'flex';
+            editingPostId = postId; // Store globally for save function
+            editPostContentInput.value = currentContent; // Populate textarea
+            editPostModal.style.display = 'flex'; // Show modal
         }
 
+        /**
+         * Saves the edited content of a post.
+         */
         async function saveEditedPost() {
             if (!editingPostId || !editPostContentInput || !editPostModal) return;
             const postRef = doc(postsCol, editingPostId);
@@ -2042,6 +2348,7 @@
             }
             const postData = postSnap.data();
 
+            // Permission check for editing post
             if (!hasPermission(PERMISSIONS.EDIT_ANY_POST) && !(hasPermission(PERMISSIONS.EDIT_OWN_POST) && currentUser.uid === postData.userId)) {
                 showModal("Você não tem permissão para editar este post.", "error"); return;
             }
@@ -2055,32 +2362,43 @@
                 await updateDoc(postRef, {
                     content: newContent,
                     lastEditedAt: Timestamp.now(),
-                    lastEditedBy: currentUserId, 
+                    lastEditedBy: currentUserId, // Track who edited
                     lastEditedByDisplayName: userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0]
                 });
                 showModal("Post atualizado com sucesso!", "success");
-                editPostModal.style.display = 'none';
-                editingPostId = null;
+                editPostModal.style.display = 'none'; // Close modal
+                editingPostId = null; // Clear global ID
+                // Post list will update via its onSnapshot listener.
             } catch (error) {
                 console.error("Error updating post:", error);
                 showModal("Erro ao atualizar post: " + error.message, "error");
             }
         }
 
+        // --- Edit Topic Functionality ---
+        /**
+         * Opens the modal to edit a topic's title and role permissions.
+         * @param {string} topicId - The ID of the topic to edit.
+         * @param {object} currentTopic - The current data of the topic.
+         */
         function openEditTopicModal(topicId, currentTopic) {
             if (!editTopicModal || !editTopicTitleInput || !editTopicRolePermissionsContainer) return;
-            editingTopicId = topicId;
-            editingTopicData = currentTopic; // Store the full topic data
+            editingTopicId = topicId; // Store globally
+            editingTopicData = currentTopic; // Store full topic data for permission checks on save
 
             editTopicTitleInput.value = currentTopic.title || '';
+            // Populate role checkboxes with current topic's allowed roles
             populateTopicRolePermissionsCheckboxes(editTopicRolePermissionsContainer, currentTopic.allowedRoles || []);
-            editTopicModal.style.display = 'flex';
+            editTopicModal.style.display = 'flex'; // Show modal
         }
 
+        /**
+         * Saves the edited title and role permissions of a topic.
+         */
         async function saveEditedTopic() {
             if (!editingTopicId || !editingTopicData || !editTopicTitleInput || !editTopicRolePermissionsContainer || !editTopicModal) return;
 
-            // Permission check: Topic creator or someone with MANAGE_CATEGORIES
+            // Permission check: Topic creator OR user with MANAGE_CATEGORIES (as proxy for "manage any topic")
             if (!(currentUser.uid === editingTopicData.createdBy || hasPermission(PERMISSIONS.MANAGE_CATEGORIES))) {
                 showModal("Você não tem permissão para editar este tópico.", "error");
                 return;
@@ -2092,7 +2410,7 @@
                 return;
             }
 
-            const selectedRoles = [];
+            const selectedRoles = []; // Get newly selected roles for the topic
             const checkboxes = document.querySelectorAll('#edit-topic-role-permissions-container input[name="topicAllowedRoles"]:checked');
             checkboxes.forEach(checkbox => selectedRoles.push(checkbox.value));
 
@@ -2100,13 +2418,13 @@
                 const topicRef = doc(topicsCol, editingTopicId);
                 await updateDoc(topicRef, {
                     title: newTitle,
-                    allowedRoles: selectedRoles.length > 0 ? selectedRoles : [] // Store empty array if none selected
+                    allowedRoles: selectedRoles.length > 0 ? selectedRoles : [] // Store empty array if none (public/inherit)
                 });
                 showModal("Tópico atualizado com sucesso!", "success");
-                editTopicModal.style.display = 'none';
-                editingTopicId = null;
+                editTopicModal.style.display = 'none'; // Close modal
+                editingTopicId = null; // Clear global IDs
                 editingTopicData = null;
-                // The topics list will refresh via its onSnapshot listener
+                // The topics list will refresh via its onSnapshot listener.
             } catch (error) {
                 console.error("Error updating topic:", error);
                 showModal("Erro ao atualizar tópico: " + error.message, "error");
@@ -2114,14 +2432,20 @@
         }
 
 
-        // --- Gemini API Integration ---
+        // --- Gemini API Integration (AI Helpers) ---
+        /**
+         * Calls the Gemini API to generate text based on a prompt.
+         * @param {string} prompt - The prompt to send to the API.
+         * @param {string} loadingElementId - ID of the spinner element to show/hide.
+         * @returns {Promise<string|null>} The generated text or null on error.
+         */
         async function callGeminiAPI(prompt, loadingElementId) {
             const loadingSpinner = document.getElementById(loadingElementId);
-            if (loadingSpinner) loadingSpinner.style.display = 'inline-block';
+            if (loadingSpinner) loadingSpinner.style.display = 'inline-block'; // Show spinner
 
             let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
             const payload = { contents: chatHistory };
-            const apiKey = ""; 
+            const apiKey = ""; // API Key will be injected by the Canvas environment if needed
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
             try {
@@ -2130,17 +2454,18 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (!response.ok) {
+                if (!response.ok) { // Handle API errors
                     const errorData = await response.json().catch(() => ({ error: { message: "Resposta não JSON da API." }}));
                     console.error("Gemini API Error Response:", errorData);
                     throw new Error(`Erro da API Gemini: ${response.status} ${response.statusText}. Detalhes: ${JSON.stringify(errorData.error?.message || errorData)}`);
                 }
                 const result = await response.json();
+                // Extract text from the response
                 if (result.candidates && result.candidates.length > 0 &&
                     result.candidates[0].content && result.candidates[0].content.parts &&
                     result.candidates[0].content.parts.length > 0) {
                     return result.candidates[0].content.parts[0].text;
-                } else {
+                } else { // Unexpected response structure
                     console.warn("Resposta inesperada da API Gemini:", result);
                     throw new Error("Resposta inesperada da API Gemini ou conteúdo ausente.");
                 }
@@ -2149,10 +2474,13 @@
                 showModal("Falha ao comunicar com a IA: " + error.message, "error");
                 return null;
             } finally {
-                if (loadingSpinner) loadingSpinner.style.display = 'none';
+                if (loadingSpinner) loadingSpinner.style.display = 'none'; // Hide spinner
             }
         }
 
+        /**
+         * Generates a category description using the Gemini API.
+         */
         async function generateCategoryDescription() {
             if (!categoryNameInput || !categoryDescriptionInput) return;
             const categoryName = categoryNameInput.value.trim();
@@ -2168,6 +2496,9 @@
             }
         }
 
+        /**
+         * Suggests a topic title using the Gemini API based on the first post content.
+         */
         async function suggestTopicTitle() {
             if (!newTopicContentInput || !newTopicTitleInput) return;
             const topicContent = newTopicContentInput.value.trim();
@@ -2175,32 +2506,40 @@
                 showModal("Por favor, escreva o conteúdo da primeira postagem primeiro.", "error");
                 return;
             }
+            // Use a substring of content to keep prompt concise
             const prompt = `Sugira um título curto e chamativo (máximo 10 palavras) para um tópico de fórum cujo primeiro post tem o seguinte conteúdo (em português do Brasil):\n\n"${topicContent.substring(0, 500)}${topicContent.length > 500 ? '...' : ''}"\n\nO título deve ser em português do Brasil.`;
             const suggestedTitle = await callGeminiAPI(prompt, 'suggest-topic-title-spinner');
             if (suggestedTitle) {
-                newTopicTitleInput.value = suggestedTitle.replace(/"/g, '').trim(); 
+                newTopicTitleInput.value = suggestedTitle.replace(/"/g, '').trim(); // Remove quotes from AI response
                 showModal("Título sugerido pela IA!", "success");
             }
         }
         
-        // --- Profile Management ---
+        // --- User Profile Management (My Profile & Public View) ---
+        /**
+         * Loads the current user's data into the "My Profile" view.
+         */
         function loadMyProfileView() {
             if (!currentUser || !userProfileData || !myProfileNicknameInput || !myProfileSteamUrlInput || !myProfileEmailDisplay || !myProfileRoleDisplay) {
                 showModal("Você precisa estar logado para ver seu perfil.", "error");
-                showView('login');
+                showView('login'); // Redirect if data not available
                 return;
             }
             myProfileNicknameInput.value = userProfileData.nickname || '';
             myProfileSteamUrlInput.value = userProfileData.steamProfileUrl || '';
-            myProfileEmailDisplay.textContent = currentUser.email; 
+            myProfileEmailDisplay.textContent = currentUser.email; // Email from auth object
             myProfileRoleDisplay.textContent = userProfileData.role || 'Membro';
-            const roleColor = currentRoleColors[userProfileData.role] || '#6b7280';
+            // Style role tag with its color
+            const roleColor = currentRoleColors[userProfileData.role] || '#6b7280'; // Default color
             myProfileRoleDisplay.style.backgroundColor = roleColor;
-            if (!myProfileRoleDisplay.classList.contains('role-tag')) {
+            if (!myProfileRoleDisplay.classList.contains('role-tag')) { // Ensure class is present
                 myProfileRoleDisplay.classList.add('role-tag');
             }
         }
 
+        /**
+         * Saves changes made by the user to their own profile.
+         */
         async function saveMyProfile() {
             if (!currentUser || !db || !myProfileNicknameInput || !myProfileSteamUrlInput) {
                 showModal("Não foi possível salvar o perfil. Tente novamente.", "error");
@@ -2214,19 +2553,25 @@
                 await updateDoc(profileRef, {
                     nickname: newNickname,
                     steamProfileUrl: newSteamUrl,
+                    // lastSeen will be updated by the onAuthStateChanged listener or other activities
                 });
                 showModal("Perfil atualizado com sucesso!", "success");
+                // userProfileData will be updated by its onSnapshot listener.
             } catch (error) {
                 console.error("Error updating profile:", error);
                 showModal("Erro ao atualizar perfil: " + error.message, "error");
             }
         }
 
+        /**
+         * Loads and displays a public user profile.
+         * @param {string} userId - The ID of the user whose profile to display.
+         */
         async function loadUserProfileView(userId) {
             if (!db || !userProfilesCol || !userProfileViewDisplayName) { 
                  showModal("Serviço de banco de dados indisponível ou UI não pronta."); return;
             }
-            showView('loading'); 
+            showView('loading'); // Show loading while fetching profile
             const profileRef = doc(userProfilesCol, userId);
             try {
                 const docSnap = await getDoc(profileRef);
@@ -2234,6 +2579,7 @@
                     const profile = docSnap.data();
                     userProfileViewDisplayName.textContent = profile.displayName || 'N/A';
                     userProfileViewNickname.textContent = profile.nickname || 'Nenhum';
+                    // Show full email only to admins or the user themselves
                     const canViewFullEmail = hasPermission(PERMISSIONS.MANAGE_USERS) || currentUserId === userId;
                     userProfileViewEmail.textContent = canViewFullEmail ? profile.email : (profile.email ? profile.email.split('@')[0] + '@...' : 'N/A');
                     
@@ -2244,27 +2590,32 @@
                          userProfileViewRole.classList.add('role-tag');
                     }
 
+                    // Display Steam profile link if available
                     if (profile.steamProfileUrl && userProfileViewSteamLink) {
                         userProfileViewSteamLink.href = profile.steamProfileUrl;
                         userProfileViewSteamLink.textContent = profile.steamProfileUrl;
-                        userProfileViewSteamLink.parentElement.style.display = 'block';
+                        userProfileViewSteamLink.parentElement.style.display = 'block'; // Show the <p> container
                     } else if (userProfileViewSteamLink) {
-                        userProfileViewSteamLink.parentElement.style.display = 'none';
+                        userProfileViewSteamLink.parentElement.style.display = 'none'; // Hide if no URL
                     }
                     if(userProfileViewRegisteredDate) userProfileViewRegisteredDate.textContent = formatTimestamp(profile.createdAt);
-                    showView('userProfile'); 
+                    showView('userProfile'); // Show the view after populating
                 } else {
                     showModal("Perfil de usuário não encontrado.", "error");
-                    showView('forumHome'); 
+                    showView('forumHome'); // Go back if profile not found
                 }
             } catch (error) {
                 console.error("Error loading user profile:", error);
                 showModal("Erro ao carregar perfil: " + error.message, "error");
-                showView('forumHome'); 
+                showView('forumHome'); // Go back on error
             }
         }
         
-        // --- Role Color & Server/Permissions Config ---
+        // --- Admin Panel: Role Color & Server/Permissions Config ---
+        /**
+         * Loads role color settings into the admin panel.
+         * Uses `currentRoleColors` which is kept up-to-date by `loadServerConfig`.
+         */
         async function loadRoleColorSettings() { 
             if (!db || !serverConfigDocRef || !hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) || !adminRoleColorSettings) return;
             adminRoleColorSettings.innerHTML = '<p class="text-gray-400">Carregando configurações de cores...</p>';
@@ -2281,12 +2632,13 @@
                 });
                 adminRoleColorSettings.innerHTML = html;
 
+                // Add event listeners to sync color picker and hex input
                 defaultRoles.forEach(role => {
                     const colorPicker = document.getElementById(`role-color-${role}`);
                     const hexInput = document.getElementById(`role-hex-${role}`);
                     if (colorPicker && hexInput) {
                         colorPicker.addEventListener('input', (e) => hexInput.value = e.target.value);
-                        hexInput.addEventListener('input', (e) => {
+                        hexInput.addEventListener('input', (e) => { // Validate hex input
                             if (/^#[0-9A-F]{6}$/i.test(e.target.value)) { 
                                 colorPicker.value = e.target.value;
                             }
@@ -2294,12 +2646,15 @@
                     }
                 });
 
-            } catch (error) { 
+            } catch (error) { // Should not happen as data comes from live config
                 console.error("Error displaying role color settings (should be from live config):", error);
                 adminRoleColorSettings.innerHTML = '<p class="text-red-400">Erro ao carregar cores.</p>';
             }
         }
 
+        /**
+         * Saves role color configurations from the admin panel to Firestore.
+         */
         async function saveRoleColors() {
             if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) { 
                  showModal("Você não tem permissão para gerenciar configurações.", "error"); return;
@@ -2308,7 +2663,7 @@
             let allValid = true;
             defaultRoles.forEach(role => {
                 const hexValue = document.getElementById(`role-hex-${role}`).value.trim();
-                if (/^#[0-9A-F]{6}$/i.test(hexValue)) {
+                if (/^#[0-9A-F]{6}$/i.test(hexValue)) { // Validate hex format
                     newRoleColors[role] = hexValue;
                 } else {
                     showModal(`Cor inválida para ${role}: ${hexValue}. Use formato #RRGGBB.`, "error");
@@ -2316,27 +2671,35 @@
                 }
             });
 
-            if (!allValid) return;
+            if (!allValid) return; // Don't save if any color is invalid
 
             try {
                 await setDoc(serverConfigDocRef, { roleColors: newRoleColors }, { merge: true });
                 showModal("Cores dos cargos salvas com sucesso!", "success");
+                // `currentRoleColors` will be updated by the `loadServerConfig` onSnapshot listener.
             } catch (error) {
                 console.error("Error saving role colors:", error);
                 showModal("Erro ao salvar cores: " + error.message, "error");
             }
         }
         
+        /**
+         * Loads server-wide configuration (forum name, registrations, roles, permissions, CS servers).
+         * Attaches a listener for real-time updates to this configuration.
+         * @returns {Promise} Resolves when initial config is loaded, rejects on critical error.
+         */
         async function loadServerConfig() { 
             return new Promise((resolve, reject) => {
-                if (!db || !serverConfigDocRef) {
+                if (!db || !serverConfigDocRef) { // Should not happen if Firebase init was successful
                     console.warn("loadServerConfig: DB or serverConfigDocRef not available. Using hardcoded defaults.");
-                    currentRoleColors = { Admin: "#FF0000", Moderador: "#00FF00", VIP: "#0000FF", Membro: "#808080" };
+                    // Apply hardcoded defaults if Firestore is totally unavailable
+                    currentRoleColors = { Admin: "#FF0000", Moderador: "#00FF00", VIP: "#0000FF", Membro: "#808080" }; // Example defaults
                     registrationsOpen = true;
+                    // Default permissions: Admin has all, Member has basic forum interaction
                     serverRolePermissionsConfig = { Admin: Object.fromEntries(Object.values(PERMISSIONS).map(p => [p, true])) };
                      defaultRoles.forEach(role => { 
                         if (!serverRolePermissionsConfig[role]) serverRolePermissionsConfig[role] = {};
-                        if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) {
+                        if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) { // Basic member perms
                              serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
                              serverRolePermissionsConfig[role][PERMISSIONS.CREATE_POST] = true;
                              serverRolePermissionsConfig[role][PERMISSIONS.EDIT_OWN_POST] = true;
@@ -2344,58 +2707,63 @@
                              serverRolePermissionsConfig[role][PERMISSIONS.DELETE_OWN_TOPIC] = true;
                         }
                     });
-                    if (userProfileData && userProfileData.role) {
+                    if (userProfileData && userProfileData.role) { // Update current user's permissions based on these defaults
                         currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
                     } else {
                         currentRolePermissions = {};
                     }
-                    resolve();
+                    resolve(); // Resolve so app can continue with defaults
                     return;
                 }
 
-                if (unsubscribeServerConfig) unsubscribeServerConfig();
-                let initialLoadDone = false;
+                if (unsubscribeServerConfig) unsubscribeServerConfig(); // Clear previous listener
+                let initialLoadDone = false; // Flag to ensure promise resolves only once
 
                 unsubscribeServerConfig = onSnapshot(serverConfigDocRef, (docSnap) => {
                     let configData = {};
                     if (docSnap.exists()) {
                         configData = docSnap.data();
-                    } else { 
+                    } else { // Config document doesn't exist in Firestore, create it with defaults
                         console.log("Server config not found in Firestore, using defaults and attempting to create.");
                         configData = {
                             forumName: "Negativa Server - Fórum",
                             registrationsOpen: true,
                             roleColors: { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" }, 
-                            rolePermissions: {}, 
-                            csServers: []
+                            rolePermissions: {}, // Will be populated below
+                            csServers: [] // Default empty CS servers list
                         };
+                        // Populate default role permissions
                         defaultRoles.forEach(role => {
                             configData.rolePermissions[role] = {};
-                            if (role === 'Admin') {
+                            if (role === 'Admin') { // Admin gets all permissions
                                 Object.values(PERMISSIONS).forEach(perm => configData.rolePermissions[role][perm] = true);
-                            } else if (role === 'Membro') {
+                            } else if (role === 'Membro') { // Basic member permissions
                                 configData.rolePermissions[role][PERMISSIONS.CREATE_TOPIC] = true;
                                 configData.rolePermissions[role][PERMISSIONS.CREATE_POST] = true;
                                 configData.rolePermissions[role][PERMISSIONS.EDIT_OWN_POST] = true;
                                 configData.rolePermissions[role][PERMISSIONS.DELETE_OWN_POST] = true;
                                 configData.rolePermissions[role][PERMISSIONS.DELETE_OWN_TOPIC] = true;
                             }
+                            // Other roles (Moderador, VIP) start with no permissions by default, admin must set them.
                         });
+                        // Save this default config to Firestore (best effort)
                         setDoc(serverConfigDocRef, configData)
                             .then(() => console.log("Default server config saved to Firestore."))
                             .catch(err => console.error("Error saving default server config:", err));
                     }
 
+                    // Update global variables with data from Firestore (or defaults if just created)
                     currentRoleColors = configData.roleColors || { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" };
                     registrationsOpen = configData.registrationsOpen === undefined ? true : configData.registrationsOpen;
                     serverRolePermissionsConfig = configData.rolePermissions || {};
                     
-                    if (Object.keys(serverRolePermissionsConfig).length === 0) {
+                    // Ensure default roles have at least an empty permission object if not in config
+                    if (Object.keys(serverRolePermissionsConfig).length === 0) { // If rolePermissions is empty from DB
                          defaultRoles.forEach(role => {
                             serverRolePermissionsConfig[role] = {};
                             if (role === 'Admin') {
                                 Object.values(PERMISSIONS).forEach(perm => serverRolePermissionsConfig[role][perm] = true);
-                            } else if (role === 'Membro') {
+                            } else if (role === 'Membro') { // Re-apply basic member perms if config was totally empty
                                 serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
                                 serverRolePermissionsConfig[role][PERMISSIONS.CREATE_POST] = true;
                                 serverRolePermissionsConfig[role][PERMISSIONS.EDIT_OWN_POST] = true;
@@ -2406,31 +2774,39 @@
                     }
 
 
+                    // Update current user's permissions if they are logged in
                     if (userProfileData && userProfileData.role) {
                         currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
                     }
 
+                    // Update UI elements affected by server config
                     if (forumTitleHeader) forumTitleHeader.textContent = configData.forumName || "Negativa Server - Fórum";
                     if (forumTitleTag) forumTitleTag.textContent = configData.forumName || "Negativa Server - Fórum";
-                    loadPublicCsServerBanners(configData.csServers || []); 
+                    loadPublicCsServerBanners(configData.csServers || []); // Display CS server banners
 
+                    // Update visibility of registration links based on 'registrationsOpen'
                     if (registerNav) registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
-                    if (adminRegistrationsToggle && isAdmin) adminRegistrationsToggle.checked = registrationsOpen; 
+                    if (registerPromptContainer) { // Link on the login page
+                        registerPromptContainer.style.display = registrationsOpen ? 'block' : 'none';
+                    }
+                    if (adminRegistrationsToggle && isAdmin) adminRegistrationsToggle.checked = registrationsOpen; // Update admin toggle
 
+                    // If admin panel is open, refresh its relevant sections
                     if (isAdmin && adminControls && adminControls.style.display === 'block') {
                         loadRolePermissionsSettings(); 
                         loadRoleColorSettings(); 
                         populateCategoryRolePermissionsCheckboxes(); 
-                        populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer);
+                        populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer); // For create topic modal
                     }
-                    console.log("[Client] Server config loaded/updated via listener. Reg Open:", registrationsOpen);
+                    console.log("[Client] Server config loaded/updated via listener. Registrations Open:", registrationsOpen);
 
-                    if (!initialLoadDone) {
+                    if (!initialLoadDone) { // Resolve promise on first successful load
                         initialLoadDone = true;
                         resolve();
                     }
-                }, (error) => {
+                }, (error) => { // Error callback for onSnapshot
                     console.error("Error loading server config:", error);
+                    // Fallback to hardcoded defaults on listener error
                     currentRoleColors = { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" };
                     registrationsOpen = true;
                     serverRolePermissionsConfig = { Admin: Object.fromEntries(Object.values(PERMISSIONS).map(p => [p, true])) };
@@ -2438,12 +2814,13 @@
                         if (!serverRolePermissionsConfig[role]) serverRolePermissionsConfig[role] = {};
                          if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) {
                              serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
+                             // Add other basic member perms here if needed for fallback
                          }
                     });
                     if (userProfileData && userProfileData.role) {
                         currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
                     }
-                    if (!initialLoadDone) {
+                    if (!initialLoadDone) { // Reject promise on first load error
                         initialLoadDone = true;
                         reject(error); 
                     }
@@ -2451,18 +2828,23 @@
             });
         }
         
+        /**
+         * Loads and displays recently active members in the aside panel.
+         */
         async function loadRecentMembers() {
             if (!db || !userProfilesCol || !recentMembersList) {
                 if(recentMembersList) recentMembersList.innerHTML = '<p class="text-xs text-gray-500">Não foi possível carregar.</p>';
                 return;
             }
-            if (unsubscribeRecentMembers) unsubscribeRecentMembers();
+            if (unsubscribeRecentMembers) unsubscribeRecentMembers(); // Clear previous listener
 
+            // Query for users, ordered by lastSeen, limited to 5
             const q = query(userProfilesCol, orderBy("lastSeen", "desc"), limit(5));
             unsubscribeRecentMembers = onSnapshot(q, (snapshot) => {
-                if (!currentUser && !registrationsOpen) { 
+                // Don't show if user is not logged in AND registrations are closed (very niche, but covers edge case)
+                 if (!currentUser && !registrationsOpen) { 
                      recentMembersList.innerHTML = ''; return;
-                }
+                 }
                 if (snapshot.empty) {
                     recentMembersList.innerHTML = '<p class="text-xs text-gray-500">Nenhum membro online recentemente.</p>';
                     return;
@@ -2471,7 +2853,7 @@
                 snapshot.forEach(doc => {
                     const member = doc.data();
                     const displayName = member.nickname || member.displayName || member.email?.split('@')[0] || 'Usuário';
-                    const roleColor = currentRoleColors[member.role] || '#6b7280';
+                    const roleColor = currentRoleColors[member.role] || '#6b7280'; // Use current server config for colors
                     membersHtml += `
                         <li class="text-xs">
                             <a href="#" class="user-profile-link text-blue-400 hover:underline" data-userid="${doc.id}">${displayName}</a>
@@ -2481,7 +2863,7 @@
                 });
                 membersHtml += '</ul>';
                 recentMembersList.innerHTML = membersHtml;
-                addProfileLinkListeners(recentMembersList);
+                addProfileLinkListeners(recentMembersList); // Add listeners for profile links
             }, (error) => {
                 console.error("Error loading recent members:", error);
                 if(recentMembersList) recentMembersList.innerHTML = '<p class="text-xs text-red-500">Erro ao carregar membros.</p>';
@@ -2489,13 +2871,16 @@
         }
 
         // --- Chat Functionality ---
+        /**
+         * Sends a chat message to Firestore.
+         */
         async function sendChatMessage() {
             if (!currentUser || !db || !chatMessagesCol || !chatMessageInput) {
                 showModal("Você precisa estar logado para enviar mensagens no chat.", "error");
                 return;
             }
             const messageText = chatMessageInput.value.trim();
-            if (!messageText) return;
+            if (!messageText) return; // Don't send empty messages
 
             const userDisplayName = userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0];
             const userRole = userProfileData?.role || 'Membro';
@@ -2504,35 +2889,40 @@
                 await addDoc(chatMessagesCol, {
                     userId: currentUserId,
                     displayName: userDisplayName,
-                    role: userRole,
+                    role: userRole, // Store role for styling messages
                     text: messageText,
                     timestamp: Timestamp.now()
                 });
-                chatMessageInput.value = '';
+                chatMessageInput.value = ''; // Clear input field
             } catch (error) {
                 console.error("Error sending chat message:", error);
                 showModal("Erro ao enviar mensagem: " + error.message, "error");
             }
         }
 
+        /**
+         * Loads and displays chat messages, and prunes old messages.
+         */
         async function loadChatMessages() {
             if (!db || !chatMessagesCol || !chatMessagesContainer) {
                 if (chatMessagesContainer) chatMessagesContainer.innerHTML = '<p class="text-xs text-gray-500">Chat indisponível.</p>';
                 return;
             }
-            if (unsubscribeChatMessages) unsubscribeChatMessages();
+            if (unsubscribeChatMessages) unsubscribeChatMessages(); // Clear previous listener
 
+            // Query for last 30 messages, ordered by timestamp
             const q = query(chatMessagesCol, orderBy("timestamp", "desc"), limit(30));
             unsubscribeChatMessages = onSnapshot(q, async (snapshot) => {
+                 // Don't show if user is not logged in AND registrations are closed
                  if (!currentUser && !registrationsOpen) { 
                      chatMessagesContainer.innerHTML = ''; return;
                  }
 
                 const messages = [];
                 snapshot.forEach(doc => messages.push({ id: doc.id, ...doc.data() }));
-                messages.reverse(); 
+                messages.reverse(); // Reverse to show oldest of the 30 first
 
-                chatMessagesContainer.innerHTML = '';
+                chatMessagesContainer.innerHTML = ''; // Clear previous messages
                 if (messages.length === 0) {
                     chatMessagesContainer.innerHTML = '<p class="text-xs text-gray-500 text-center">Nenhuma mensagem ainda. Seja o primeiro!</p>';
                 } else {
@@ -2541,10 +2931,12 @@
                         const messageDiv = document.createElement('div');
                         messageDiv.className = 'chat-message text-xs';
 
+                        // Delete button: For message author or users with MODERATE_CHAT permission
                         let deleteButtonHtml = '';
                         if (hasPermission(PERMISSIONS.MODERATE_CHAT) || (currentUser && msg.userId === currentUser.uid)) { 
                             deleteButtonHtml = `<button class="delete-chat-msg-btn" data-msg-id="${msg.id}" title="Apagar mensagem">X</button>`;
                         }
+                        // Sanitize text to prevent HTML injection
                         const sanitizedText = msg.text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
                         messageDiv.innerHTML = `
@@ -2556,25 +2948,29 @@
                         `;
                         chatMessagesContainer.appendChild(messageDiv);
                     });
-                    addProfileLinkListeners(chatMessagesContainer);
+                    addProfileLinkListeners(chatMessagesContainer); // Add listeners for profile links in chat
+                    // Add listeners for delete buttons
                     chatMessagesContainer.querySelectorAll('.delete-chat-msg-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             const msgId = e.target.dataset.msgId;
                             const messageToDelete = messages.find(m => m.id === msgId);
+                            // Moderator deleting someone else's message requires confirmation
                             if (hasPermission(PERMISSIONS.MODERATE_CHAT) && messageToDelete && messageToDelete.userId !== currentUserId) {
                                 confirmAction("Tem certeza que deseja apagar esta mensagem do chat?", () => deleteChatMessage(msgId));
-                            } else if (messageToDelete && messageToDelete.userId === currentUserId) { 
-                                deleteChatMessage(msgId);
+                            } else if (messageToDelete && messageToDelete.userId === currentUserId) { // User deleting their own message
+                                deleteChatMessage(msgId); // No confirmation needed
                             }
                         });
                     });
-                    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight; 
+                    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight; // Scroll to bottom
                 }
 
-                if (snapshot.docs.length >= 30) { 
-                    const allMessagesQuery = query(chatMessagesCol, orderBy("timestamp", "asc")); 
+                // Prune old messages if total exceeds a threshold (e.g., 50)
+                if (snapshot.docs.length >= 30) { // Only check if we fetched the limit
+                    const allMessagesQuery = query(chatMessagesCol, orderBy("timestamp", "asc")); // Get all, oldest first
                     const allMessagesSnap = await getDocs(allMessagesQuery);
-                    if (allMessagesSnap.docs.length > 50) { 
+                    if (allMessagesSnap.docs.length > 50) { // If more than 50 total
+                        // Delete the oldest messages to bring count down to 30 (or desired number)
                         const messagesToDelete = allMessagesSnap.docs.slice(0, allMessagesSnap.docs.length - 30); 
                         for (const docToDelete of messagesToDelete) {
                             try {
@@ -2592,22 +2988,33 @@
             });
         }
         
+        /**
+         * Deletes a specific chat message.
+         * @param {string} messageId - The ID of the chat message to delete.
+         */
         async function deleteChatMessage(messageId) {
             try {
                 await deleteDoc(doc(chatMessagesCol, messageId));
+                // UI will update via onSnapshot
             } catch (error) {
                 console.error("Error deleting chat message:", error);
                 showModal("Erro ao apagar mensagem do chat: " + error.message, "error");
             }
         }
         
+        // --- Admin Panel: Role Permissions Management ---
+        /**
+         * Loads and displays the role permission settings in the admin panel.
+         * Uses `serverRolePermissionsConfig` which is kept up-to-date by `loadServerConfig`.
+         */
         function loadRolePermissionsSettings() { 
             if (!db || !serverConfigDocRef || !hasPermission(PERMISSIONS.MANAGE_ROLES_PERMISSIONS) || !adminPermissionsSettings) {
-                if(adminPermissionsSettings) adminPermissionsSettings.innerHTML = ''; 
+                if(adminPermissionsSettings) adminPermissionsSettings.innerHTML = ''; // Clear if no permission
                 return;
             }
             adminPermissionsSettings.innerHTML = '<p class="text-gray-400">Carregando permissões...</p>';
             
+            // User-friendly labels for permissions
             const permissionLabels = {
                 [PERMISSIONS.MANAGE_FORUM_SETTINGS]: "Gerenciar Config. Fórum",
                 [PERMISSIONS.MANAGE_USERS]: "Gerenciar Usuários",
@@ -2626,14 +3033,15 @@
 
             let html = '<div class="space-y-4">';
             defaultRoles.forEach(role => {
-                if (role === 'Admin') return; 
+                if (role === 'Admin') return; // Admin permissions are not editable through this UI (always all true)
 
                 html += `<div class="bg-gray-700 p-3 rounded-md">
                             <h5 class="text-md font-semibold text-blue-300 mb-2">${role}</h5>
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">`;
                 Object.keys(PERMISSIONS).forEach(permKey => {
                     const permValue = PERMISSIONS[permKey];
-                    if (permValue === PERMISSIONS.MANAGE_ROLES_PERMISSIONS && role === 'Admin') return;
+                    // Don't show "Manage Roles Permissions" for non-Admin roles, as Admins always have it
+                    if (permValue === PERMISSIONS.MANAGE_ROLES_PERMISSIONS && role !== 'Admin') return; 
 
                     const isChecked = serverRolePermissionsConfig[role] && serverRolePermissionsConfig[role][permValue];
                     html += `
@@ -2651,35 +3059,42 @@
             adminPermissionsSettings.innerHTML = html;
         }
 
+        /**
+         * Saves role permissions from the admin panel to Firestore.
+         */
         async function saveRolePermissions() {
             if (!hasPermission(PERMISSIONS.MANAGE_ROLES_PERMISSIONS)) {
                 showModal("Você não tem permissão para gerenciar permissões.", "error"); return;
             }
 
+            // Create a deep copy to modify, ensuring Admin role retains all permissions
             const newPermissionsConfig = JSON.parse(JSON.stringify(serverRolePermissionsConfig)); 
 
             defaultRoles.forEach(role => {
-                if (role === 'Admin') { 
-                    newPermissionsConfig[role] = {};
+                if (role === 'Admin') { // Ensure Admin role always has all permissions
+                    newPermissionsConfig[role] = {}; // Reset and reassign
                     Object.values(PERMISSIONS).forEach(permValue => {
                         newPermissionsConfig[role][permValue] = true;
                     });
                     return; 
                 }
                 
-                if (!newPermissionsConfig[role]) newPermissionsConfig[role] = {}; 
+                if (!newPermissionsConfig[role]) newPermissionsConfig[role] = {}; // Initialize if role is new
                 
+                // Update permissions based on checkbox states
                 Object.values(PERMISSIONS).forEach(permValue => {
                     const checkbox = document.getElementById(`perm-${role}-${permValue}`);
-                    if (checkbox) { 
+                    if (checkbox) { // If checkbox exists for this perm and role
                         newPermissionsConfig[role][permValue] = checkbox.checked;
                     } 
+                    // If checkbox doesn't exist (e.g. MANAGE_ROLES_PERMISSIONS for non-Admin), it won't be changed
                 });
             });
 
             try {
                 await setDoc(serverConfigDocRef, { rolePermissions: newPermissionsConfig }, { merge: true });
                 showModal("Permissões dos cargos salvas com sucesso!", "success");
+                // `serverRolePermissionsConfig` and `currentRolePermissions` will be updated by `loadServerConfig` onSnapshot.
             } catch (error) {
                 console.error("Error saving role permissions:", error);
                 showModal("Erro ao salvar permissões: " + error.message, "error");
@@ -2687,13 +3102,18 @@
         }
 
 
-        // --- Modal & Confirmation ---
+        // --- Modal & Confirmation Dialogs ---
         const messageModal = document.getElementById('message-modal');
         const messageModalText = document.getElementById('message-modal-text');
         const messageModalClose = document.getElementById('message-modal-close');
 
+        /**
+         * Shows a generic message modal.
+         * @param {string} message - The message to display.
+         * @param {string} type - "info", "success", or "error" for styling.
+         */
         function showModal(message, type = "info") { 
-            if (!messageModal || !messageModalText) {
+            if (!messageModal || !messageModalText) { // Fallback if modal elements aren't found
                 console.warn("Message modal elements not found. Message:", message);
                 if (type === "error") console.error(message);
                 else if (type === "success") console.log("SUCCESS:", message);
@@ -2701,14 +3121,15 @@
                 return;
             }
             messageModalText.textContent = message;
-            messageModalText.className = 'mb-4 '; 
+            messageModalText.className = 'mb-4 '; // Reset classes
             if (type === "error") messageModalText.classList.add('text-red-700');
             else if (type === "success") messageModalText.classList.add('text-green-700');
-            else messageModalText.classList.add('text-blue-700'); 
-            messageModal.style.display = 'flex';
+            else messageModalText.classList.add('text-blue-700'); // Default to info style
+            messageModal.style.display = 'flex'; // Show modal
         }
         if (messageModalClose) messageModalClose.onclick = () => messageModal.style.display = 'none';
         
+        // Close modals if clicked outside their content area
         window.onclick = (event) => { 
             if (event.target == messageModal) messageModal.style.display = 'none';
             
@@ -2723,30 +3144,38 @@
             if (editTopicModal && event.target == editTopicModal) editTopicModal.style.display = 'none';
         }
 
+        // Confirmation Modal elements and logic
         const confirmModal = document.getElementById('confirm-action-modal');
         const confirmModalText = document.getElementById('confirm-action-text');
         const confirmModalYes = document.getElementById('confirm-action-yes');
         const confirmModalNo = document.getElementById('confirm-action-no');
-        let confirmCallback = null;
+        let confirmCallback = null; // Stores the function to call if "Yes" is clicked
 
+        /**
+         * Shows a confirmation dialog.
+         * @param {string} message - The confirmation message.
+         * @param {Function} callback - The function to execute if confirmed.
+         */
         function confirmAction(message, callback) {
-            if (!confirmModal || !confirmModalText) {
+            if (!confirmModal || !confirmModalText) { // Fallback if modal not found
                 console.warn("Confirm modal elements not found. Action:", message);
+                // For critical actions, you might want to prevent the action if confirmation isn't possible.
+                // However, for this example, we'll log and not proceed.
                 console.error("Confirmation modal not available for: " + message + ". Action NOT performed.");
                 return;
             }
             confirmModalText.textContent = message;
             confirmCallback = callback;
-            confirmModal.style.display = 'flex';
+            confirmModal.style.display = 'flex'; // Show modal
         }
         if (confirmModalYes) confirmModalYes.onclick = () => {
-            if (confirmCallback) confirmCallback();
-            confirmModal.style.display = 'none';
-            confirmCallback = null;
+            if (confirmCallback) confirmCallback(); // Execute the stored callback
+            confirmModal.style.display = 'none'; // Hide modal
+            confirmCallback = null; // Clear callback
         };
         if (confirmModalNo) confirmModalNo.onclick = () => {
-            confirmModal.style.display = 'none';
-            confirmCallback = null;
+            confirmModal.style.display = 'none'; // Hide modal
+            confirmCallback = null; // Clear callback
         };
 
     </script>
@@ -2770,7 +3199,7 @@
     </header>
 
     <div id="server-info-banner-container" class="container mx-auto mt-4 space-y-2">
-    </div>
+        </div>
 
 
     <main id="main-content" class="container mx-auto p-4">
@@ -2792,7 +3221,7 @@
                 </div>
                 <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-md transition duration-150">Entrar</button>
             </form>
-            <p class="text-center mt-4 text-sm">Não tem uma conta? <a href="#" id="show-register-view" class="text-blue-400 hover:underline">Registre-se</a></p>
+            <p id="register-prompt-container" class="text-center mt-4 text-sm">Não tem uma conta? <a href="#" id="show-register-view" class="text-blue-400 hover:underline">Registre-se</a></p>
         </div>
 
         <div id="register-view" class="view max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl">
@@ -2816,7 +3245,7 @@
         </div>
 
         <div id="forum-home-view" class="view">
-            <div id="admin-controls" class="mb-6 bg-gray-800 p-6 rounded-lg shadow-md">
+            <div id="admin-controls" class="mb-6 bg-gray-800 p-6 rounded-lg shadow-md" style="display:none;">
                 <h3 class="text-2xl font-bold mb-6 text-yellow-500 border-b border-gray-700 pb-3">Painel do Administrador</h3>
                 
                 <div class="admin-section">
@@ -2851,10 +3280,10 @@
                             <label for="category-description" class="block text-sm font-medium text-gray-300 mb-1">Descrição</label>
                             <textarea id="category-description" name="description" rows="2" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400"></textarea>
                         </div>
-                        <div id="category-role-permissions-admin-container" class="mt-2 mb-2">
+                        <div class="mt-2 mb-2">
                             <label class="block text-sm font-medium text-gray-300 mb-1">Permitir visualização para os cargos (deixe desmarcado para público):</label>
-                            <div class="space-y-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                            </div>
+                            <div id="category-role-permissions-admin-container">
+                                </div>
                         </div>
                         <div class="flex items-center space-x-2">
                             <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-2 px-4 rounded-md transition duration-150">Criar Categoria</button>
@@ -2869,28 +3298,28 @@
                 <div class="admin-section">
                     <h4 class="admin-section-title">Configurar Servidores CS2</h4>
                     <div id="cs-servers-list-admin" class="space-y-2 mb-3">
-                    </div>
+                        </div>
                     <button id="add-cs-server-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Adicionar Servidor CS2</button>
                 </div>
 
                 <div class="admin-section">
                     <h4 class="admin-section-title">Configurações de Cores dos Cargos</h4>
                     <div id="admin-role-color-settings" class="space-y-2">
-                    </div>
+                        </div>
                     <button id="save-role-colors-btn" class="mt-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Cores dos Cargos</button>
                 </div>
                 
                 <div class="admin-section">
                     <h4 class="admin-section-title">Permissões dos Cargos</h4>
                     <div id="admin-permissions-settings" class="space-y-4">
-                    </div>
+                        </div>
                     <button id="save-permissions-btn" class="mt-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Permissões</button>
                 </div>
 
                 <div class="admin-section">
                     <h4 class="admin-section-title">Gerenciamento de Usuários</h4>
                     <div id="admin-user-list" class="space-y-3 max-h-96 overflow-y-auto">
-                    </div>
+                        </div>
                 </div>
             </div>
 
@@ -2898,7 +3327,7 @@
                 <div class="md:col-span-3">
                     <h2 class="text-2xl font-semibold mb-6 text-blue-400">Categorias</h2>
                     <div id="categories-list" class="space-y-4">
-                    </div>
+                        </div>
                 </div>
                 <aside class="md:col-span-1 bg-gray-800 p-4 rounded-lg shadow-md">
                     <div id="recent-members-list">
@@ -2907,7 +3336,7 @@
                     <div class="mt-6 pt-4 border-t border-gray-700">
                         <h4 class="text-md font-semibold text-gray-300 mb-2">Chat Rápido</h4>
                         <div id="chat-messages" class="bg-gray-700 p-2 rounded h-48 overflow-y-auto text-xs mb-2">
-                        </div>
+                            </div>
                         <div class="flex">
                             <input type="text" id="chat-message-input" class="flex-grow p-2 bg-gray-600 border border-gray-500 rounded-l-md text-gray-100 placeholder-gray-400 text-sm" placeholder="Digite sua mensagem...">
                             <button id="send-chat-message-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-r-md text-sm">Enviar</button>
@@ -2923,15 +3352,15 @@
                 <button id="show-create-topic-modal" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Novo Tópico</button>
             </div>
             <div id="topics-list" class="space-y-3">
-            </div>
+                </div>
         </div>
 
         <div id="topic-view" class="view">
             <h2 id="topic-title-full" class="text-2xl font-semibold mb-6 text-blue-400"></h2>
             <div id="topic-poll-container" class="mb-6">
-            </div>
+                </div>
             <div id="posts-list" class="mb-6">
-            </div>
+                </div>
             <form id="create-post-form" class="bg-gray-800 p-6 rounded-lg shadow-md">
                 <h3 class="text-xl font-semibold mb-4 text-gray-200">Responder ao Tópico</h3>
                 <div>
@@ -3005,9 +3434,9 @@
                     <label for="new-topic-command" class="block text-sm font-medium text-gray-300 mb-1">Comando para Copiar (Opcional)</label>
                     <input type="text" id="new-topic-command" name="commandToCopy" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400" placeholder="Ex: connect seu.ip.aqui:porta">
                 </div>
-                <div id="topic-role-permissions-container" class="mb-4">
+                <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-300 mb-1">Permitir visualização para os cargos (deixe desmarcado para herdar da categoria/público):</label>
-                    <div class="space-y-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    <div id="topic-role-permissions-container">
                         </div>
                 </div>
 
@@ -3026,14 +3455,13 @@
     <div id="edit-topic-modal" class="modal" style="display:none;">
         <div class="modal-content modal-content-lg bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full">
             <h3 class="text-xl font-semibold mb-4 text-blue-400">Editar Tópico</h3>
-            <form id="edit-topic-form-modal">
-                <div class="mb-4">
+            <form id="edit-topic-form-modal"> <div class="mb-4">
                     <label for="edit-topic-title" class="block text-sm font-medium text-gray-300 mb-1">Título do Tópico</label>
                     <input type="text" id="edit-topic-title" name="title" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400">
                 </div>
-                <div id="edit-topic-role-permissions-container" class="mb-4">
+                <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-300 mb-1">Permitir visualização para os cargos (deixe desmarcado para herdar da categoria/público):</label>
-                    <div class="space-y-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    <div id="edit-topic-role-permissions-container">
                         </div>
                 </div>
                 <div class="flex justify-end space-x-3">
@@ -3059,8 +3487,7 @@
         <div class="modal-content bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-semibold mb-4 text-blue-400">Configurar Servidor CS2</h3>
             <form id="cs-server-form">
-                <input type="hidden" id="cs-server-id">
-                <div class="mb-4">
+                <input type="hidden" id="cs-server-id"> <div class="mb-4">
                     <label for="cs-server-name" class="block text-sm font-medium text-gray-300 mb-1">Nome de Exibição do Servidor</label>
                     <input type="text" id="cs-server-name" required class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400">
                 </div>
