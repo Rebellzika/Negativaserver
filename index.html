@@ -391,6 +391,11 @@
                     loadUserProfileView(params.userId);
                 } else if (viewName === 'myProfile') {
                     loadMyProfileView();
+                } else if (viewName === 'login') { 
+                    // Ensure the registration prompt on the login page reflects the current server setting
+                    if (registerPromptContainer) {
+                        registerPromptContainer.style.display = registrationsOpen ? 'block' : 'none';
+                    }
                 }
             } else {
                 console.error(`View ${viewName} not found. Defaulting to login or forum home.`);
@@ -811,7 +816,7 @@
                                 } else if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
                                      adminControls.style.display = 'none'; // Ensure it's closed if no perms
                                 }
-                                registerNav.style.display = registrationsOpen ? 'inline-block' : 'none'; // Show/hide main register nav link
+                                // registerNav.style.display is handled by loadServerConfig's onSnapshot
                                 loadCategories(); // Load main forum content
                                 loadRecentMembers();
                                 loadChatMessages();
@@ -819,7 +824,9 @@
                             } catch (error) {
                                 console.error("Failed to load initial server config:", error);
                                 showModal("Erro crítico ao carregar configurações do servidor.", "error");
-                                registerNav.style.display = 'inline-block'; // Fallback for register nav visibility
+                                // Fallback for register nav visibility if server config load fails critically
+                                if(registerNav) registerNav.style.display = registrationsOpen ? 'inline-block' : 'none'; 
+                                if(registerPromptContainer) registerPromptContainer.style.display = registrationsOpen ? 'block' : 'none';
                                 showView('forumHome'); // Still try to show forum home
                             }
                         }
@@ -855,15 +862,25 @@
                     adminPanelNav.style.display = 'none';
                     adminPanelNav.textContent = 'Painel Admin'; // Reset admin panel button text
                     
-                    await loadServerConfig(); // Load server config to know if registrations are open
-                    registerNav.style.display = registrationsOpen ? 'inline-block' : 'none'; // Show/hide main register nav link
-                    // The registerPromptContainer on the login page will be handled by loadServerConfig's onSnapshot
-
+                    try {
+                        await loadServerConfig(); // This promise resolves after the first snapshot update,
+                                                  // which itself updates registrationsOpen and related UI.
+                    } catch (error) {
+                        console.error("Error during server config load for logged-out state:", error);
+                        // registrationsOpen would have been set to its fallback (now false)
+                        // by loadServerConfig's snapshot error handler, and UI updated there.
+                        // If loadServerConfig itself throws before even attaching snapshot (less likely),
+                        // then registrationsOpen remains its JS default (true).
+                        // To be absolutely safe, re-apply based on current registrationsOpen here.
+                        if (registerNav) registerNav.style.display = registrationsOpen ? 'inline-block' : 'none'; 
+                        if (registerPromptContainer) registerPromptContainer.style.display = registrationsOpen ? 'block' : 'none';
+                    }
+                    
                     // Clear dynamic content areas
                     if(serverInfoBannerContainer) serverInfoBannerContainer.innerHTML = ''; 
                     if(recentMembersList) recentMembersList.innerHTML = ''; 
                     if(chatMessagesContainer) chatMessagesContainer.innerHTML = ''; 
-                    showView('login'); // Show login view
+                    showView('login'); // Show login view, which will also re-check registrationsOpen for the prompt
                 }
             });
         } else {
@@ -892,7 +909,8 @@
                      console.log("No custom token. Waiting for onAuthStateChanged or user login.");
                      // If no token and no user currently, onAuthStateChanged will show login
                      if (!auth.currentUser) { 
-                        showView('login'); 
+                        // loadServerConfig will be called by onAuthStateChanged when user is null
+                        // showView('login') will also be called there.
                      }
                 }
             } catch (error) {
@@ -1306,8 +1324,8 @@
         function populateCategoryRolePermissionsCheckboxes() {
             if (!categoryRolePermissionsAdminContainer) return;
             categoryRolePermissionsAdminContainer.innerHTML = ''; 
-            const listContainer = document.createElement('div'); // Changed from gridContainer
-            listContainer.className = "flex flex-col space-y-1"; // Use flex column
+            const listContainer = document.createElement('div'); 
+            listContainer.className = "flex flex-col space-y-1"; 
 
             defaultRoles.forEach(role => {
                 if (role === 'Admin') return; 
@@ -1319,9 +1337,9 @@
                            class="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-400">
                     <span>${role}</span>
                 `;
-                listContainer.appendChild(label); // Append to listContainer
+                listContainer.appendChild(label); 
             });
-            categoryRolePermissionsAdminContainer.appendChild(listContainer); // Append the list
+            categoryRolePermissionsAdminContainer.appendChild(listContainer); 
         }
 
         /**
@@ -1333,8 +1351,8 @@
         function populateTopicRolePermissionsCheckboxes(container, currentAllowedRoles = []) {
             if (!container) return;
             container.innerHTML = ''; 
-            const listContainer = document.createElement('div'); // Changed from gridContainer
-            listContainer.className = "flex flex-col space-y-1"; // Use flex column
+            const listContainer = document.createElement('div'); 
+            listContainer.className = "flex flex-col space-y-1"; 
 
             defaultRoles.forEach(role => {
                 if (role === 'Admin') return; 
@@ -1348,9 +1366,9 @@
                            ${isChecked ? 'checked' : ''}>
                     <span>${role}</span>
                 `;
-                listContainer.appendChild(label); // Append to listContainer
+                listContainer.appendChild(label); 
             });
-            container.appendChild(listContainer); // Append the list
+            container.appendChild(listContainer); 
         }
 
 
@@ -2690,16 +2708,14 @@
          */
         async function loadServerConfig() { 
             return new Promise((resolve, reject) => {
-                if (!db || !serverConfigDocRef) { // Should not happen if Firebase init was successful
-                    console.warn("loadServerConfig: DB or serverConfigDocRef not available. Using hardcoded defaults.");
-                    // Apply hardcoded defaults if Firestore is totally unavailable
-                    currentRoleColors = { Admin: "#FF0000", Moderador: "#00FF00", VIP: "#0000FF", Membro: "#808080" }; // Example defaults
-                    registrationsOpen = true;
-                    // Default permissions: Admin has all, Member has basic forum interaction
+                if (!db || !serverConfigDocRef) { 
+                    console.warn("loadServerConfig: DB or serverConfigDocRef not available. Using hardcoded defaults and attempting to make registrations closed as a safe default.");
+                    currentRoleColors = { Admin: "#FF0000", Moderador: "#00FF00", VIP: "#0000FF", Membro: "#808080" };
+                    registrationsOpen = false; // Safe default if config is inaccessible
                     serverRolePermissionsConfig = { Admin: Object.fromEntries(Object.values(PERMISSIONS).map(p => [p, true])) };
                      defaultRoles.forEach(role => { 
                         if (!serverRolePermissionsConfig[role]) serverRolePermissionsConfig[role] = {};
-                        if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) { // Basic member perms
+                        if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) { 
                              serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
                              serverRolePermissionsConfig[role][PERMISSIONS.CREATE_POST] = true;
                              serverRolePermissionsConfig[role][PERMISSIONS.EDIT_OWN_POST] = true;
@@ -2707,63 +2723,61 @@
                              serverRolePermissionsConfig[role][PERMISSIONS.DELETE_OWN_TOPIC] = true;
                         }
                     });
-                    if (userProfileData && userProfileData.role) { // Update current user's permissions based on these defaults
+                    if (userProfileData && userProfileData.role) { 
                         currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
                     } else {
                         currentRolePermissions = {};
                     }
-                    resolve(); // Resolve so app can continue with defaults
+                    // Update UI elements based on this safe default
+                    if (registerNav) registerNav.style.display = 'none';
+                    if (registerPromptContainer) registerPromptContainer.style.display = 'none';
+                    resolve(); 
                     return;
                 }
 
-                if (unsubscribeServerConfig) unsubscribeServerConfig(); // Clear previous listener
-                let initialLoadDone = false; // Flag to ensure promise resolves only once
+                if (unsubscribeServerConfig) unsubscribeServerConfig(); 
+                let initialLoadDone = false; 
 
                 unsubscribeServerConfig = onSnapshot(serverConfigDocRef, (docSnap) => {
                     let configData = {};
                     if (docSnap.exists()) {
                         configData = docSnap.data();
-                    } else { // Config document doesn't exist in Firestore, create it with defaults
+                    } else { 
                         console.log("Server config not found in Firestore, using defaults and attempting to create.");
                         configData = {
                             forumName: "Negativa Server - Fórum",
-                            registrationsOpen: true,
+                            registrationsOpen: true, // Default to true for a *new* setup
                             roleColors: { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" }, 
-                            rolePermissions: {}, // Will be populated below
-                            csServers: [] // Default empty CS servers list
+                            rolePermissions: {}, 
+                            csServers: [] 
                         };
-                        // Populate default role permissions
                         defaultRoles.forEach(role => {
                             configData.rolePermissions[role] = {};
-                            if (role === 'Admin') { // Admin gets all permissions
+                            if (role === 'Admin') { 
                                 Object.values(PERMISSIONS).forEach(perm => configData.rolePermissions[role][perm] = true);
-                            } else if (role === 'Membro') { // Basic member permissions
+                            } else if (role === 'Membro') { 
                                 configData.rolePermissions[role][PERMISSIONS.CREATE_TOPIC] = true;
                                 configData.rolePermissions[role][PERMISSIONS.CREATE_POST] = true;
                                 configData.rolePermissions[role][PERMISSIONS.EDIT_OWN_POST] = true;
                                 configData.rolePermissions[role][PERMISSIONS.DELETE_OWN_POST] = true;
                                 configData.rolePermissions[role][PERMISSIONS.DELETE_OWN_TOPIC] = true;
                             }
-                            // Other roles (Moderador, VIP) start with no permissions by default, admin must set them.
                         });
-                        // Save this default config to Firestore (best effort)
                         setDoc(serverConfigDocRef, configData)
                             .then(() => console.log("Default server config saved to Firestore."))
                             .catch(err => console.error("Error saving default server config:", err));
                     }
 
-                    // Update global variables with data from Firestore (or defaults if just created)
                     currentRoleColors = configData.roleColors || { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" };
                     registrationsOpen = configData.registrationsOpen === undefined ? true : configData.registrationsOpen;
                     serverRolePermissionsConfig = configData.rolePermissions || {};
                     
-                    // Ensure default roles have at least an empty permission object if not in config
-                    if (Object.keys(serverRolePermissionsConfig).length === 0) { // If rolePermissions is empty from DB
+                    if (Object.keys(serverRolePermissionsConfig).length === 0) { 
                          defaultRoles.forEach(role => {
                             serverRolePermissionsConfig[role] = {};
                             if (role === 'Admin') {
                                 Object.values(PERMISSIONS).forEach(perm => serverRolePermissionsConfig[role][perm] = true);
-                            } else if (role === 'Membro') { // Re-apply basic member perms if config was totally empty
+                            } else if (role === 'Membro') { 
                                 serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
                                 serverRolePermissionsConfig[role][PERMISSIONS.CREATE_POST] = true;
                                 serverRolePermissionsConfig[role][PERMISSIONS.EDIT_OWN_POST] = true;
@@ -2773,56 +2787,59 @@
                         });
                     }
 
-
-                    // Update current user's permissions if they are logged in
                     if (userProfileData && userProfileData.role) {
                         currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
                     }
 
-                    // Update UI elements affected by server config
                     if (forumTitleHeader) forumTitleHeader.textContent = configData.forumName || "Negativa Server - Fórum";
                     if (forumTitleTag) forumTitleTag.textContent = configData.forumName || "Negativa Server - Fórum";
-                    loadPublicCsServerBanners(configData.csServers || []); // Display CS server banners
+                    loadPublicCsServerBanners(configData.csServers || []); 
 
-                    // Update visibility of registration links based on 'registrationsOpen'
                     if (registerNav) registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
-                    if (registerPromptContainer) { // Link on the login page
+                    if (registerPromptContainer) { 
                         registerPromptContainer.style.display = registrationsOpen ? 'block' : 'none';
                     }
-                    if (adminRegistrationsToggle && isAdmin) adminRegistrationsToggle.checked = registrationsOpen; // Update admin toggle
+                    if (adminRegistrationsToggle && isAdmin) adminRegistrationsToggle.checked = registrationsOpen; 
 
-                    // If admin panel is open, refresh its relevant sections
                     if (isAdmin && adminControls && adminControls.style.display === 'block') {
                         loadRolePermissionsSettings(); 
                         loadRoleColorSettings(); 
                         populateCategoryRolePermissionsCheckboxes(); 
-                        populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer); // For create topic modal
+                        populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer); 
                     }
                     console.log("[Client] Server config loaded/updated via listener. Registrations Open:", registrationsOpen);
 
-                    if (!initialLoadDone) { // Resolve promise on first successful load
+                    if (!initialLoadDone) {
                         initialLoadDone = true;
                         resolve();
                     }
-                }, (error) => { // Error callback for onSnapshot
-                    console.error("Error loading server config:", error);
-                    // Fallback to hardcoded defaults on listener error
+                }, (error) => { 
+                    console.error("Error in serverConfig onSnapshot listener:", error);
                     currentRoleColors = { Admin: "#D32F2F", Moderador: "#1976D2", VIP: "#7B1FA2", Membro: "#616161" };
-                    registrationsOpen = true;
+                    registrationsOpen = false; // << SAFER DEFAULT IN CASE OF LISTENER ERROR
                     serverRolePermissionsConfig = { Admin: Object.fromEntries(Object.values(PERMISSIONS).map(p => [p, true])) };
                      defaultRoles.forEach(role => {
                         if (!serverRolePermissionsConfig[role]) serverRolePermissionsConfig[role] = {};
                          if (role === 'Membro' && Object.keys(serverRolePermissionsConfig[role]).length === 0) {
                              serverRolePermissionsConfig[role][PERMISSIONS.CREATE_TOPIC] = true;
-                             // Add other basic member perms here if needed for fallback
                          }
                     });
                     if (userProfileData && userProfileData.role) {
                         currentRolePermissions = serverRolePermissionsConfig[userProfileData.role] || {};
                     }
-                    if (!initialLoadDone) { // Reject promise on first load error
+                    
+                    // Update UI elements to reflect the safer default
+                    if (forumTitleHeader) forumTitleHeader.textContent = "Negativa Server - Fórum (Erro de Config.)";
+                    if (forumTitleTag) forumTitleTag.textContent = "Negativa Server - Fórum (Erro de Config.)";
+                    if (registerNav) registerNav.style.display = registrationsOpen ? 'inline-block' : 'none'; // Should be 'none'
+                    if (registerPromptContainer) registerPromptContainer.style.display = registrationsOpen ? 'block' : 'none'; // Should be 'none'
+                    loadPublicCsServerBanners([]); 
+
+                    if (!initialLoadDone) {
                         initialLoadDone = true;
                         reject(error); 
+                    } else {
+                        showModal("Erro ao carregar configurações do servidor. Cadastros podem estar temporariamente indisponíveis.", "error");
                     }
                 });
             });
