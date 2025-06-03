@@ -142,8 +142,16 @@
             padding-bottom: 0.5rem; 
             border-bottom: 1px solid #4a5568; 
         }
-        #admin-controls { /* Ensure it's hidden by default */
+        #admin-controls { 
             display: none;
+        }
+        .edit-topic-btn-icon {
+            cursor: pointer;
+            margin-left: 8px;
+            color: #fbbf24; /* amber-400 */
+        }
+        .edit-topic-btn-icon:hover {
+            color: #f59e0b; /* amber-500 */
         }
 
     </style>
@@ -262,6 +270,11 @@
         let unsubscribeRecentMembers = null;
         let unsubscribeChatMessages = null;
         let unsubscribeCurrentUserProfile = null; 
+        
+        let editingPostId = null; // For editing post content
+        let editingTopicId = null; // For editing topic metadata (title, roles)
+        let editingTopicData = null; // To store current topic data for the edit modal
+
 
         const PERMISSIONS = {
             MANAGE_FORUM_SETTINGS: 'canManageForumSettings',
@@ -277,6 +290,7 @@
             DELETE_ANY_POST: 'canDeleteAnyPost',
             MODERATE_CHAT: 'canModerateChat',
             MANAGE_ROLES_PERMISSIONS: 'canManageRolesPermissions'
+            // Consider adding EDIT_ANY_TOPIC if more granular control is needed than MANAGE_CATEGORIES
         };
 
         const defaultRoles = ['Admin', 'Moderador', 'VIP', 'Membro'];
@@ -296,7 +310,9 @@
             csServerNameInput, csServerConnectInput, cancelCsServerBtn, serverInfoBannerContainer, recentMembersList,
             editPostModal, editPostContentInput, saveEditPostBtn, cancelEditPostBtn, chatMessagesContainer,
             chatMessageInput, sendChatMessageBtn, backToForumFromProfileBtn, adminPermissionsSettings, savePermissionsBtn,
-            categoryRolePermissionsAdminContainer; // New container for category role checkboxes
+            categoryRolePermissionsAdminContainer, topicRolePermissionsContainer, editTopicModal, editTopicTitleInput, 
+            editTopicRolePermissionsContainer, saveEditTopicBtn, cancelEditTopicBtn;
+
 
         function formatTimestamp(firebaseTimestamp) {
             if (!firebaseTimestamp || typeof firebaseTimestamp.seconds !== 'number') {
@@ -363,7 +379,7 @@
             logoutNav = document.getElementById('logout-nav');
             myProfileNav = document.getElementById('my-profile-nav');
             adminControls = document.getElementById('admin-controls');
-            adminPanelNav = document.getElementById('admin-panel-nav'); // New button
+            adminPanelNav = document.getElementById('admin-panel-nav'); 
             categoriesList = document.getElementById('categories-list');
             topicsList = document.getElementById('topics-list');
             postsList = document.getElementById('posts-list');
@@ -426,6 +442,13 @@
             adminPermissionsSettings = document.getElementById('admin-permissions-settings');
             savePermissionsBtn = document.getElementById('save-permissions-btn');
             categoryRolePermissionsAdminContainer = document.getElementById('category-role-permissions-admin-container');
+            topicRolePermissionsContainer = document.getElementById('topic-role-permissions-container'); // For create topic modal
+            
+            editTopicModal = document.getElementById('edit-topic-modal');
+            editTopicTitleInput = document.getElementById('edit-topic-title');
+            editTopicRolePermissionsContainer = document.getElementById('edit-topic-role-permissions-container');
+            saveEditTopicBtn = document.getElementById('save-edit-topic-btn');
+            cancelEditTopicBtn = document.getElementById('cancel-edit-topic-btn');
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -457,20 +480,19 @@
                 });
             }
 
-            // Admin Panel Toggle Button
             if (adminPanelNav && adminControls) {
                 adminPanelNav.addEventListener('click', (e) => {
                     e.preventDefault();
                     if (adminControls.style.display === 'none' || adminControls.style.display === '') {
                         adminControls.style.display = 'block';
                         adminPanelNav.textContent = 'Fechar Painel Admin';
-                        // Load admin data if not already loaded, or ensure it's fresh
                         if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
                             loadUsersForAdmin(); 
                             loadAdminServerSettings(); 
                             loadRoleColorSettings();
                             loadRolePermissionsSettings();
-                            populateCategoryRolePermissionsCheckboxes(); // For create category form
+                            populateCategoryRolePermissionsCheckboxes(); 
+                            populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer); // For create topic modal
                         }
                     } else {
                         adminControls.style.display = 'none';
@@ -542,6 +564,10 @@
 
             if (generateCategoryDescBtn) generateCategoryDescBtn.addEventListener('click', generateCategoryDescription);
             if (suggestTopicTitleBtn) suggestTopicTitleBtn.addEventListener('click', suggestTopicTitle);
+
+            if (saveEditTopicBtn) saveEditTopicBtn.addEventListener('click', saveEditedTopic);
+            if (cancelEditTopicBtn) cancelEditTopicBtn.addEventListener('click', () => editTopicModal.style.display = 'none');
+
 
             if (auth) {
                 initAuth(); 
@@ -629,14 +655,14 @@
                                 console.log(`[Profile Listener] Initial profile load (${initialProfileLoad}) or role change (from ${oldRole} to ${userProfileData.role}). Refreshing UI components.`);
                                 adminPanelNav.style.display = hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) ? 'inline-block' : 'none';
                                 if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) && adminControls.style.display === 'block') {
-                                    // If panel is already open, refresh its contents
                                     loadUsersForAdmin(); 
                                     loadAdminServerSettings(); 
                                     loadRoleColorSettings();
                                     loadRolePermissionsSettings();
-                                    populateCategoryRolePermissionsCheckboxes();
+                                    populateCategoryRolePermissionsCheckboxes(); 
+                                    populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer);
                                 } else if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
-                                    adminControls.style.display = 'none'; // Ensure panel is hidden if permissions lost
+                                    adminControls.style.display = 'none'; 
                                     adminPanelNav.textContent = 'Painel Admin';
                                 }
                             }
@@ -681,6 +707,7 @@
                                     loadRoleColorSettings();
                                     loadRolePermissionsSettings();
                                     populateCategoryRolePermissionsCheckboxes();
+                                    populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer);
                                 } else if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
                                      adminControls.style.display = 'none';
                                 }
@@ -1107,9 +1134,9 @@
 
         function populateCategoryRolePermissionsCheckboxes() {
             if (!categoryRolePermissionsAdminContainer) return;
-            categoryRolePermissionsAdminContainer.innerHTML = ''; // Clear existing
+            categoryRolePermissionsAdminContainer.innerHTML = ''; 
             defaultRoles.forEach(role => {
-                if (role === 'Admin') return; // Admins always have access
+                if (role === 'Admin') return; 
                 const checkboxId = `category-perm-role-${role}`;
                 const label = document.createElement('label');
                 label.className = 'flex items-center space-x-2 text-sm text-gray-300';
@@ -1119,6 +1146,25 @@
                     <span>${role}</span>
                 `;
                 categoryRolePermissionsAdminContainer.appendChild(label);
+            });
+        }
+
+        function populateTopicRolePermissionsCheckboxes(container, currentAllowedRoles = []) {
+            if (!container) return;
+            container.innerHTML = ''; // Clear existing
+            defaultRoles.forEach(role => {
+                if (role === 'Admin') return; // Admins always have access
+                const checkboxId = `topic-perm-role-${role}-${container.id}`; // Make ID unique per container
+                const isChecked = currentAllowedRoles.includes(role);
+                const label = document.createElement('label');
+                label.className = 'flex items-center space-x-2 text-sm text-gray-300';
+                label.innerHTML = `
+                    <input type="checkbox" id="${checkboxId}" name="topicAllowedRoles" value="${role}" 
+                           class="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-400"
+                           ${isChecked ? 'checked' : ''}>
+                    <span>${role}</span>
+                `;
+                container.appendChild(label);
             });
         }
 
@@ -1155,11 +1201,10 @@
                         userDisplayName: userDisplayNameForActivity,
                         timestamp: Timestamp.now()
                     },
-                    allowedRoles: selectedRoles // Save the selected roles
+                    allowedRoles: selectedRoles 
                 });
                 showModal("Categoria criada com sucesso!", "success");
                 e.target.reset();
-                // Clear checkboxes in the form
                 document.querySelectorAll('#category-role-permissions-admin-container input[name="categoryAllowedRoles"]').forEach(cb => cb.checked = false);
 
             } catch (error) {
@@ -1197,7 +1242,7 @@
 
                 snapshot.docs.forEach(doc => {
                     const category = doc.data();
-                    category.id = doc.id; // Add id to the category object for convenience
+                    category.id = doc.id; 
                     if (isAdmin) {
                         categoriesToShow.push(category);
                     } else {
@@ -1208,7 +1253,7 @@
                     }
                 });
 
-                if (categoriesToShow.length === 0 && !isAdmin) { // No public categories and user is not admin
+                if (categoriesToShow.length === 0 && !isAdmin) { 
                      categoriesList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhuma categoria disponível para seu cargo.</div>';
                      showView('forumHome');
                      return;
@@ -1347,7 +1392,7 @@
 
         let currentCategoryName = '';
         let currentCategoryId = null;
-        let currentCategoryAllowedRoles = []; // Store allowed roles of the current category
+        let currentCategoryAllowedRoles = []; 
 
         function openCreateTopicModal() {
             if (!hasPermission(PERMISSIONS.CREATE_TOPIC)) {
@@ -1359,6 +1404,7 @@
             if (newTopicTitleInput) newTopicTitleInput.value = ''; 
             if (newTopicContentInput) newTopicContentInput.value = ''; 
             if (newTopicCommandInput) newTopicCommandInput.value = '';
+            populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer, currentCategoryAllowedRoles); // Populate with category's roles as default
             
             const createTopicModal = document.getElementById('create-topic-modal');
             if(createTopicModal) createTopicModal.style.display = 'flex';
@@ -1382,13 +1428,14 @@
                 return;
             }
 
+            const selectedTopicRoles = [];
+            const topicRoleCheckboxes = document.querySelectorAll('#topic-role-permissions-container input[name="topicAllowedRoles"]:checked');
+            topicRoleCheckboxes.forEach(checkbox => selectedTopicRoles.push(checkbox.value));
+
+
             const now = Timestamp.now();
             const userDisplayName = userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0];
             
-            // For now, topics inherit category's allowedRoles.
-            // Later, we can add UI to set topic-specific roles.
-            const topicAllowedRoles = currentCategoryAllowedRoles; // Inherit from category
-
             try {
                 const topicRef = await addDoc(topicsCol, {
                     categoryId: currentCategoryId,
@@ -1402,7 +1449,7 @@
                     lastReplyBy: currentUserId,
                     lastReplyByDisplayName: userDisplayName,
                     viewCount: 0,
-                    allowedRoles: topicAllowedRoles // Save inherited or topic-specific roles
+                    allowedRoles: selectedTopicRoles.length > 0 ? selectedTopicRoles : [] // Store empty if none, to inherit from category or be public
                 });
 
                 await addDoc(postsCol, {
@@ -1444,7 +1491,10 @@
                 showView('category');
                 return; 
             }
-            if (!currentUser) { showView('login'); return; }
+            if (!currentUser || !userProfileData) { // Ensure userProfileData is available for role checks
+                 console.log("loadTopics: currentUser or userProfileData not available.");
+                 showView('login'); return; 
+            }
 
             showView('loading');
             currentCategoryId = categoryId;
@@ -1452,7 +1502,6 @@
             categoryTitle.textContent = categoryName;
             updateBreadcrumbs([{name: categoryName, view: 'category', id: categoryId}]);
 
-            // Fetch the category to check its permissions first
             const categoryRef = doc(categoriesCol, categoryId);
             const categorySnap = await getDoc(categoryRef);
             if (!categorySnap.exists()) {
@@ -1461,33 +1510,43 @@
                 return;
             }
             const categoryData = categorySnap.data();
-            currentCategoryAllowedRoles = categoryData.allowedRoles || []; // Store for topic creation
+            currentCategoryAllowedRoles = categoryData.allowedRoles || []; 
 
-            if (!isAdmin && currentCategoryAllowedRoles.length > 0 && !currentCategoryAllowedRoles.includes(userProfileData?.role)) {
+            if (!isAdmin && currentCategoryAllowedRoles.length > 0 && !currentCategoryAllowedRoles.includes(userProfileData.role)) {
                 topicsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Você não tem permissão para ver os tópicos desta categoria.</div>';
                 showView('category');
                 return;
             }
             
             topicsList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando tópicos...</p>';
-            // Topics will inherit category's allowedRoles if they don't have their own (future feature)
-            // For now, all topics in a visible category are visible to those who can see the category.
             const q = query(topicsCol, where("categoryId", "==", categoryId)); 
             
             if (unsubscribeTopics) unsubscribeTopics();
             unsubscribeTopics = onSnapshot(q, async (snapshot) => {
-                if (!currentUser) return;
+                if (!currentUser || !userProfileData) return; // Check again inside snapshot
                 
                 const topicsToShow = [];
                 snapshot.docs.forEach(doc => {
                     const topic = doc.data();
                     topic.id = doc.id;
-                    // Future: Add topic-specific allowedRoles check here, falling back to category's
-                    topicsToShow.push(topic); 
+                    let canViewThisTopic = false;
+                    if (isAdmin) {
+                        canViewThisTopic = true;
+                    } else {
+                        const topicRoles = topic.allowedRoles;
+                        if (topicRoles && topicRoles.length > 0) { // Topic has specific roles
+                            if (topicRoles.includes(userProfileData.role)) {
+                                canViewThisTopic = true;
+                            }
+                        } else { // Topic inherits from category (which we've already checked)
+                            canViewThisTopic = true; // If category check passed, and topic has no specific roles, it's viewable
+                        }
+                    }
+                    if(canViewThisTopic) topicsToShow.push(topic);
                 });
 
                 if (topicsToShow.length === 0) {
-                    topicsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhum tópico encontrado nesta categoria. Seja o primeiro a criar um!</div>';
+                    topicsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhum tópico encontrado (ou visível para você) nesta categoria.</div>';
                     showView('category');
                     return;
                 }
@@ -1518,7 +1577,7 @@
                     } catch (err) { console.error("Error fetching user profiles for topics:", err); }
                 }
                 
-                const sortedDocs = topicsToShow.sort((a,b) => { // Sort the filtered topics
+                const sortedDocs = topicsToShow.sort((a,b) => { 
                     const timeA = a.lastReplyAt?.seconds || a.createdAt?.seconds || 0;
                     const timeB = b.lastReplyAt?.seconds || b.createdAt?.seconds || 0;
                     return timeB - timeA;
@@ -1529,16 +1588,26 @@
                     const createdByDisplayName = profiles[topic.createdBy]?.displayName || topic.userDisplayName || 'Desconhecido';
                     const lastReplyByDisplayName = profiles[topic.lastReplyBy]?.displayName || topic.lastReplyByDisplayName || 'N/A';
                     
-                    let deleteBtnHtml = '';
-                    if (hasPermission(PERMISSIONS.DELETE_ANY_TOPIC) || (hasPermission(PERMISSIONS.DELETE_OWN_TOPIC) && currentUser.uid === topic.createdBy)) {
-                        deleteBtnHtml = `<button class="delete-topic-btn text-red-500 hover:text-red-400 text-xs ml-2 self-start p-1" data-id="${topic.id}" data-title="${topic.title}">Excluir</button>`;
+                    let topicActionsHtml = '';
+                    if (currentUser.uid === topic.createdBy || hasPermission(PERMISSIONS.MANAGE_CATEGORIES) ) {
+                         topicActionsHtml += `<svg class="edit-topic-btn-icon w-4 h-4 inline-block" data-topic-id="${topic.id}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>`;
                     }
+                    if (hasPermission(PERMISSIONS.DELETE_ANY_TOPIC) || (hasPermission(PERMISSIONS.DELETE_OWN_TOPIC) && currentUser.uid === topic.createdBy)) {
+                        topicActionsHtml += `<button class="delete-topic-btn text-red-500 hover:text-red-400 text-xs ml-2 self-start p-1" data-id="${topic.id}" data-title="${topic.title}">Excluir</button>`;
+                    }
+                    const topicPrivacyInfo = (topic.allowedRoles && topic.allowedRoles.length > 0) 
+                        ? `<p class="text-xs text-yellow-400 mt-1">Privado para: ${topic.allowedRoles.join(', ')}</p>` 
+                        : (currentCategoryAllowedRoles.length > 0 ? `<p class="text-xs text-yellow-400 mt-1">Privado (herdado da categoria)</p>` : `<p class="text-xs text-green-400 mt-1">Público</p>`);
+
 
                     topicsHtml += `
-                        <div class="bg-gray-800 p-4 rounded-lg shadow flex justify-between items-center hover:bg-gray-700 transition-colors duration-150 topic-link-container">
+                        <div class="bg-gray-800 p-4 rounded-lg shadow flex justify-between items-start hover:bg-gray-700 transition-colors duration-150 topic-link-container">
                             <div class="flex-grow">
-                                <h4 class="text-lg font-medium text-blue-400 hover:text-blue-300 cursor-pointer topic-title-link" data-id="${topic.id}" data-title="${topic.title}">${topic.title}</h4>
-                                <p class="text-xs text-gray-500">
+                                <h4 class="text-lg font-medium text-blue-400 hover:text-blue-300 cursor-pointer topic-title-link" data-id="${topic.id}" data-title="${topic.title}">
+                                    ${topic.title}
+                                </h4>
+                                ${topicPrivacyInfo}
+                                <p class="text-xs text-gray-500 mt-1">
                                     Criado por: <a href="#" class="text-blue-300 hover:underline user-profile-link" data-userid="${topic.createdBy}">${createdByDisplayName}</a> (${formatTimestamp(topic.createdAt)})
                                 </p>
                                 <p class="text-xs text-gray-500">Visualizações: ${topic.viewCount || 0} | Respostas: ${topic.replyCount || 0}</p>
@@ -1547,12 +1616,28 @@
                                 <p class="truncate">Última por: <a href="#" class="text-blue-300 hover:underline user-profile-link" data-userid="${topic.lastReplyBy}">${lastReplyByDisplayName}</a></p>
                                 <p class="text-xs text-gray-500">${formatTimestamp(topic.lastReplyAt)}</p>
                             </div>
-                            ${deleteBtnHtml}
+                            <div class="flex flex-col items-end space-y-1 ml-2">
+                                ${topicActionsHtml}
+                            </div>
                         </div>
                     `;
                 });
                 topicsList.innerHTML = topicsHtml;
                 addProfileLinkListeners(topicsList);
+                // Add event listeners for edit topic buttons
+                topicsList.querySelectorAll('.edit-topic-btn-icon').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        e.stopPropagation(); // Prevent topic navigation
+                        const topicId = e.target.closest('.edit-topic-btn-icon').dataset.topicId;
+                        const topicRef = doc(topicsCol, topicId);
+                        const topicSnap = await getDoc(topicRef);
+                        if (topicSnap.exists()) {
+                            openEditTopicModal(topicId, topicSnap.data());
+                        } else {
+                            showModal("Tópico não encontrado para editar.", "error");
+                        }
+                    });
+                });
                 showView('category');
             }, (error) => {
                 console.error("Error loading topics:", error);
@@ -1565,21 +1650,32 @@
         }
 
         async function handleTopicListClick(e) {
-            if (e.target.classList.contains('delete-topic-btn')) {
+            const target = e.target;
+            if (target.classList.contains('delete-topic-btn')) {
                  e.stopPropagation();
-                 const topicId = e.target.dataset.id;
-                 const topicTitle = e.target.dataset.title;
+                 const topicId = target.dataset.id;
+                 const topicTitle = target.dataset.title;
                  confirmAction(`Tem certeza que deseja excluir o tópico "${topicTitle}" e todos os seus posts?`, async () => {
                     if (!db) { showModal("Serviço de banco de dados indisponível."); return; }
                     await deleteTopic(topicId);
                 });
-            } else if (e.target.classList.contains('user-profile-link')) {
+            } else if (target.classList.contains('user-profile-link')) {
                 e.preventDefault();
                 e.stopPropagation();
-                const userIdToShow = e.target.dataset.userid;
+                const userIdToShow = target.dataset.userid;
                 if (userIdToShow) showView('userProfile', { userId: userIdToShow });
+            } else if (target.closest('.edit-topic-btn-icon')) { // Click on SVG or its path
+                e.stopPropagation();
+                const topicId = target.closest('.edit-topic-btn-icon').dataset.topicId;
+                const topicRef = doc(topicsCol, topicId);
+                const topicSnap = await getDoc(topicRef);
+                if (topicSnap.exists()) {
+                    openEditTopicModal(topicId, topicSnap.data());
+                } else {
+                    showModal("Tópico não encontrado para editar.", "error");
+                }
             } else {
-                const topicLink = e.target.closest('.topic-link-container')?.querySelector('.topic-title-link');
+                const topicLink = target.closest('.topic-link-container')?.querySelector('.topic-title-link');
                 if (topicLink && topicLink.dataset.id) {
                     const topicId = topicLink.dataset.id;
                     const topicTitle = topicLink.dataset.title;
@@ -1706,35 +1802,68 @@
                 showView('topic');
                 return; 
             }
-            if (!currentUser) { showView('login'); return; }
+            if (!currentUser || !userProfileData) { showView('login'); return; } // Ensure profile data for permission checks
 
             showView('loading');
-            currentTopicId = topicId;
-            currentTopicTitle = topicTitleFromLink; 
+            currentTopicId = topicId; // Set for creating new posts
+            
+            const topicRef = doc(topicsCol, topicId);
+            const topicSnap = await getDoc(topicRef);
+
+            if (!topicSnap.exists()) {
+                showModal("Tópico não encontrado.", "error");
+                showView('category'); 
+                return;
+            }
+            const topicData = topicSnap.data();
+            currentTopicTitle = topicData.title; // Use title from DB for consistency
             topicTitleFull.textContent = currentTopicTitle;
 
-            if (!currentCategoryId || !currentCategoryName) {
-                try {
-                    const topicDoc = await getDoc(doc(topicsCol, topicId));
-                    if (topicDoc.exists()) {
-                        const topicData = topicDoc.data();
-                        if (topicData.categoryId) {
+
+            // Permission check for the topic itself
+            let canViewThisTopic = false;
+            if (isAdmin) {
+                canViewThisTopic = true;
+            } else {
+                const topicSpecificRoles = topicData.allowedRoles;
+                if (topicSpecificRoles && topicSpecificRoles.length > 0) {
+                    if (userProfileData && topicSpecificRoles.includes(userProfileData.role)) {
+                        canViewThisTopic = true;
+                    }
+                } else { // Topic inherits from category
+                    // currentCategoryAllowedRoles should have been set when navigating to the category
+                    // If navigating directly, fetch category to get its roles
+                    let categoryAllowedRolesForTopic = currentCategoryAllowedRoles; // Use if already set
+                    if (topicData.categoryId && (!currentCategoryId || currentCategoryId !== topicData.categoryId)) {
+                        const parentCategoryRef = doc(categoriesCol, topicData.categoryId);
+                        const parentCategorySnap = await getDoc(parentCategoryRef);
+                        if (parentCategorySnap.exists()) {
+                            categoryAllowedRolesForTopic = parentCategorySnap.data().allowedRoles || [];
+                            currentCategoryName = parentCategorySnap.data().name; // Update breadcrumb info
                             currentCategoryId = topicData.categoryId;
-                            const categoryDoc = await getDoc(doc(categoriesCol, currentCategoryId));
-                            if (categoryDoc.exists()) {
-                                currentCategoryName = categoryDoc.data().name;
-                            } else { currentCategoryName = "Categoria Desconhecida"; }
-                        } else { currentCategoryName = "Categoria Desconhecida"; }
-                    } else { currentCategoryName = "Categoria Desconhecida"; }
-                } catch (err) {
-                    console.error("Error fetching category details for breadcrumbs:", err);
-                    currentCategoryName = "Categoria"; 
+                        } else {
+                             categoryAllowedRolesForTopic = []; // Category not found, assume restricted
+                        }
+                    }
+                    
+                    if (categoryAllowedRolesForTopic.length === 0 || (userProfileData && categoryAllowedRolesForTopic.includes(userProfileData.role))) {
+                        canViewThisTopic = true;
+                    }
                 }
             }
+
+            if (!canViewThisTopic) {
+                showModal("Você não tem permissão para visualizar este tópico.", "error");
+                showView(currentCategoryId ? 'category' : 'forumHome'); // Go back to category or home
+                return;
+            }
+            
+            // Update breadcrumbs after confirming category details
             updateBreadcrumbs([
                 {name: currentCategoryName || "Categoria", view: 'category', id: currentCategoryId}, 
                 {name: currentTopicTitle, view: 'topic', id: topicId}
             ]);
+
 
             if (document.getElementById('topic-poll-container')) document.getElementById('topic-poll-container').innerHTML = ''; 
 
@@ -1745,14 +1874,9 @@
             unsubscribePosts = onSnapshot(q, async (snapshot) => {
                 if (!currentUser) return;
                 if (snapshot.empty) {
-                    const topicSnap = await getDoc(doc(topicsCol, topicId));
-                    if (!topicSnap.exists()) {
-                        postsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Este tópico não existe mais ou foi movido.</div>';
-                        showModal("Tópico não encontrado.", "error");
-                    } else {
-                        postsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhuma postagem encontrada neste tópico. Seja o primeiro a responder!</div>';
-                    }
-                     showView('topic');
+                    // Topic exists (checked above), so it's just empty of posts
+                    postsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhuma postagem encontrada neste tópico. Seja o primeiro a responder!</div>';
+                    showView('topic');
                     return;
                 }
 
@@ -1904,7 +2028,7 @@
 
         function openEditPostModal(postId, currentContent) {
             if (!editPostModal || !editPostContentInput) return;
-            editingPostId = postId;
+            editingPostId = postId; // Ensure this is declared globally
             editPostContentInput.value = currentContent; 
             editPostModal.style.display = 'flex';
         }
@@ -1940,6 +2064,52 @@
             } catch (error) {
                 console.error("Error updating post:", error);
                 showModal("Erro ao atualizar post: " + error.message, "error");
+            }
+        }
+
+        function openEditTopicModal(topicId, currentTopic) {
+            if (!editTopicModal || !editTopicTitleInput || !editTopicRolePermissionsContainer) return;
+            editingTopicId = topicId;
+            editingTopicData = currentTopic; // Store the full topic data
+
+            editTopicTitleInput.value = currentTopic.title || '';
+            populateTopicRolePermissionsCheckboxes(editTopicRolePermissionsContainer, currentTopic.allowedRoles || []);
+            editTopicModal.style.display = 'flex';
+        }
+
+        async function saveEditedTopic() {
+            if (!editingTopicId || !editingTopicData || !editTopicTitleInput || !editTopicRolePermissionsContainer || !editTopicModal) return;
+
+            // Permission check: Topic creator or someone with MANAGE_CATEGORIES
+            if (!(currentUser.uid === editingTopicData.createdBy || hasPermission(PERMISSIONS.MANAGE_CATEGORIES))) {
+                showModal("Você não tem permissão para editar este tópico.", "error");
+                return;
+            }
+
+            const newTitle = editTopicTitleInput.value.trim();
+            if (!newTitle) {
+                showModal("O título do tópico não pode ficar vazio.", "error");
+                return;
+            }
+
+            const selectedRoles = [];
+            const checkboxes = document.querySelectorAll('#edit-topic-role-permissions-container input[name="topicAllowedRoles"]:checked');
+            checkboxes.forEach(checkbox => selectedRoles.push(checkbox.value));
+
+            try {
+                const topicRef = doc(topicsCol, editingTopicId);
+                await updateDoc(topicRef, {
+                    title: newTitle,
+                    allowedRoles: selectedRoles.length > 0 ? selectedRoles : [] // Store empty array if none selected
+                });
+                showModal("Tópico atualizado com sucesso!", "success");
+                editTopicModal.style.display = 'none';
+                editingTopicId = null;
+                editingTopicData = null;
+                // The topics list will refresh via its onSnapshot listener
+            } catch (error) {
+                console.error("Error updating topic:", error);
+                showModal("Erro ao atualizar tópico: " + error.message, "error");
             }
         }
 
@@ -2250,7 +2420,8 @@
                     if (isAdmin && adminControls && adminControls.style.display === 'block') {
                         loadRolePermissionsSettings(); 
                         loadRoleColorSettings(); 
-                        populateCategoryRolePermissionsCheckboxes(); // Also populate here when server config updates
+                        populateCategoryRolePermissionsCheckboxes(); 
+                        populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer);
                     }
                     console.log("[Client] Server config loaded/updated via listener. Reg Open:", registrationsOpen);
 
@@ -2549,6 +2720,7 @@
             
             if (csServerModal && event.target == csServerModal) csServerModal.style.display = 'none';
             if (editPostModal && event.target == editPostModal) editPostModal.style.display = 'none';
+            if (editTopicModal && event.target == editTopicModal) editTopicModal.style.display = 'none';
         }
 
         const confirmModal = document.getElementById('confirm-action-modal');
@@ -2682,7 +2854,7 @@
                         <div id="category-role-permissions-admin-container" class="mt-2 mb-2">
                             <label class="block text-sm font-medium text-gray-300 mb-1">Permitir visualização para os cargos (deixe desmarcado para público):</label>
                             <div class="space-y-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                </div>
+                            </div>
                         </div>
                         <div class="flex items-center space-x-2">
                             <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-2 px-4 rounded-md transition duration-150">Criar Categoria</button>
@@ -2833,6 +3005,11 @@
                     <label for="new-topic-command" class="block text-sm font-medium text-gray-300 mb-1">Comando para Copiar (Opcional)</label>
                     <input type="text" id="new-topic-command" name="commandToCopy" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400" placeholder="Ex: connect seu.ip.aqui:porta">
                 </div>
+                <div id="topic-role-permissions-container" class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Permitir visualização para os cargos (deixe desmarcado para herdar da categoria/público):</label>
+                    <div class="space-y-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        </div>
+                </div>
 
                 <div class="flex justify-end space-x-3 items-center">
                     <button type="button" id="suggest-topic-title-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-md transition duration-150 text-sm">
@@ -2846,6 +3023,27 @@
         </div>
     </div>
 
+    <div id="edit-topic-modal" class="modal" style="display:none;">
+        <div class="modal-content modal-content-lg bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full">
+            <h3 class="text-xl font-semibold mb-4 text-blue-400">Editar Tópico</h3>
+            <form id="edit-topic-form-modal">
+                <div class="mb-4">
+                    <label for="edit-topic-title" class="block text-sm font-medium text-gray-300 mb-1">Título do Tópico</label>
+                    <input type="text" id="edit-topic-title" name="title" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400">
+                </div>
+                <div id="edit-topic-role-permissions-container" class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Permitir visualização para os cargos (deixe desmarcado para herdar da categoria/público):</label>
+                    <div class="space-y-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        </div>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-edit-topic-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-md">Cancelar</button>
+                    <button type="button" id="save-edit-topic-btn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <div id="confirm-action-modal" class="modal" style="display:none;">
         <div class="modal-content bg-gray-100 text-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md">
             <h3 class="text-lg font-semibold mb-4 text-yellow-500">Confirmar Ação</h3>
