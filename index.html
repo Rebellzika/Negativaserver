@@ -128,19 +128,22 @@
         }
         /* Admin Panel Section Styling */
         .admin-section {
-            background-color: rgba(42, 50, 66, 0.5); /* bg-gray-800 with opacity or a slightly different shade */
-            padding: 1.5rem; /* p-6 */
-            border-radius: 0.5rem; /* rounded-lg */
-            margin-bottom: 1.5rem; /* mb-6 */
-            border: 1px solid #4a5568; /* border-gray-700 */
+            background-color: rgba(42, 50, 66, 0.5); 
+            padding: 1.5rem; 
+            border-radius: 0.5rem; 
+            margin-bottom: 1.5rem; 
+            border: 1px solid #4a5568; 
         }
         .admin-section-title {
-            font-size: 1.125rem; /* text-lg */
-            font-weight: 600; /* font-semibold */
-            color: #facc15; /* text-yellow-400 (adjusted for better contrast if needed) */
-            margin-bottom: 1rem; /* mb-4 */
-            padding-bottom: 0.5rem; /* pb-2 */
-            border-bottom: 1px solid #4a5568; /* border-gray-700 */
+            font-size: 1.125rem; 
+            font-weight: 600; 
+            color: #facc15; 
+            margin-bottom: 1rem; 
+            padding-bottom: 0.5rem; 
+            border-bottom: 1px solid #4a5568; 
+        }
+        #admin-controls { /* Ensure it's hidden by default */
+            display: none;
         }
 
     </style>
@@ -175,7 +178,7 @@
             orderBy,
             limit,
             runTransaction,
-            setLogLevel // Added for debug logging
+            setLogLevel 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
@@ -282,7 +285,7 @@
         let registrationsOpen = true; 
 
         const views = {}; 
-        let forumTitleHeader, forumTitleTag, userDisplay, loginNav, registerNav, logoutNav, myProfileNav, adminControls,
+        let forumTitleHeader, forumTitleTag, userDisplay, loginNav, registerNav, logoutNav, myProfileNav, adminControls, adminPanelNav,
             categoriesList, topicsList, postsList, categoryTitle, topicTitleFull, breadcrumbs, currentUserIdDisplay,
             adminUserList, generateCategoryDescBtn, categoryNameInput, categoryDescriptionInput, suggestTopicTitleBtn,
             newTopicContentInput, newTopicTitleInput, newTopicCommandInput, myProfileNicknameInput, myProfileSteamUrlInput,
@@ -292,7 +295,8 @@
             saveRegistrationSettingsBtn, csServersListAdmin, addCsServerBtn, csServerModal, csServerForm, csServerIdInput,
             csServerNameInput, csServerConnectInput, cancelCsServerBtn, serverInfoBannerContainer, recentMembersList,
             editPostModal, editPostContentInput, saveEditPostBtn, cancelEditPostBtn, chatMessagesContainer,
-            chatMessageInput, sendChatMessageBtn, backToForumFromProfileBtn, adminPermissionsSettings, savePermissionsBtn;
+            chatMessageInput, sendChatMessageBtn, backToForumFromProfileBtn, adminPermissionsSettings, savePermissionsBtn,
+            categoryRolePermissionsAdminContainer; // New container for category role checkboxes
 
         function formatTimestamp(firebaseTimestamp) {
             if (!firebaseTimestamp || typeof firebaseTimestamp.seconds !== 'number') {
@@ -359,6 +363,7 @@
             logoutNav = document.getElementById('logout-nav');
             myProfileNav = document.getElementById('my-profile-nav');
             adminControls = document.getElementById('admin-controls');
+            adminPanelNav = document.getElementById('admin-panel-nav'); // New button
             categoriesList = document.getElementById('categories-list');
             topicsList = document.getElementById('topics-list');
             postsList = document.getElementById('posts-list');
@@ -420,6 +425,7 @@
 
             adminPermissionsSettings = document.getElementById('admin-permissions-settings');
             savePermissionsBtn = document.getElementById('save-permissions-btn');
+            categoryRolePermissionsAdminContainer = document.getElementById('category-role-permissions-admin-container');
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -450,6 +456,30 @@
                     showView('myProfile');
                 });
             }
+
+            // Admin Panel Toggle Button
+            if (adminPanelNav && adminControls) {
+                adminPanelNav.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (adminControls.style.display === 'none' || adminControls.style.display === '') {
+                        adminControls.style.display = 'block';
+                        adminPanelNav.textContent = 'Fechar Painel Admin';
+                        // Load admin data if not already loaded, or ensure it's fresh
+                        if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
+                            loadUsersForAdmin(); 
+                            loadAdminServerSettings(); 
+                            loadRoleColorSettings();
+                            loadRolePermissionsSettings();
+                            populateCategoryRolePermissionsCheckboxes(); // For create category form
+                        }
+                    } else {
+                        adminControls.style.display = 'none';
+                        adminPanelNav.textContent = 'Painel Admin';
+                    }
+                });
+            }
+
+
             if (myProfileSaveBtn) myProfileSaveBtn.addEventListener('click', saveMyProfile);
             if (saveRoleColorsBtn) saveRoleColorsBtn.addEventListener('click', saveRoleColors);
             if (saveForumNameBtn) saveForumNameBtn.addEventListener('click', saveForumName);
@@ -597,14 +627,17 @@
                             }
                             if (initialProfileLoad || (oldRole && oldRole !== userProfileData.role)) {
                                 console.log(`[Profile Listener] Initial profile load (${initialProfileLoad}) or role change (from ${oldRole} to ${userProfileData.role}). Refreshing UI components.`);
-                                if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
-                                    adminControls.style.display = 'block';
+                                adminPanelNav.style.display = hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) ? 'inline-block' : 'none';
+                                if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) && adminControls.style.display === 'block') {
+                                    // If panel is already open, refresh its contents
                                     loadUsersForAdmin(); 
                                     loadAdminServerSettings(); 
                                     loadRoleColorSettings();
                                     loadRolePermissionsSettings();
-                                } else {
-                                    adminControls.style.display = 'none';
+                                    populateCategoryRolePermissionsCheckboxes();
+                                } else if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
+                                    adminControls.style.display = 'none'; // Ensure panel is hidden if permissions lost
+                                    adminPanelNav.textContent = 'Painel Admin';
                                 }
                             }
 
@@ -637,18 +670,19 @@
                             loginNav.style.display = 'none';
                             logoutNav.style.display = 'inline-block';
                             myProfileNav.style.display = 'inline-block';
+                            adminPanelNav.style.display = hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) ? 'inline-block' : 'none';
                             
                             try {
                                 await loadServerConfig(); 
                                 console.log("[Auth State] Server config loaded. Proceeding with other data loads.");
-                                if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
-                                    adminControls.style.display = 'block';
+                                if (hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS) && adminControls.style.display === 'block') {
                                     loadUsersForAdmin();
                                     loadAdminServerSettings(); 
                                     loadRoleColorSettings();
                                     loadRolePermissionsSettings();
-                                } else {
-                                    adminControls.style.display = 'none';
+                                    populateCategoryRolePermissionsCheckboxes();
+                                } else if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
+                                     adminControls.style.display = 'none';
                                 }
                                 registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
                                 loadCategories();
@@ -689,6 +723,8 @@
                     logoutNav.style.display = 'none';
                     myProfileNav.style.display = 'none';
                     adminControls.style.display = 'none';
+                    adminPanelNav.style.display = 'none';
+                    adminPanelNav.textContent = 'Painel Admin';
                     
                     await loadServerConfig(); 
                     registerNav.style.display = registrationsOpen ? 'inline-block' : 'none';
@@ -1069,6 +1105,23 @@
             }
         }
 
+        function populateCategoryRolePermissionsCheckboxes() {
+            if (!categoryRolePermissionsAdminContainer) return;
+            categoryRolePermissionsAdminContainer.innerHTML = ''; // Clear existing
+            defaultRoles.forEach(role => {
+                if (role === 'Admin') return; // Admins always have access
+                const checkboxId = `category-perm-role-${role}`;
+                const label = document.createElement('label');
+                label.className = 'flex items-center space-x-2 text-sm text-gray-300';
+                label.innerHTML = `
+                    <input type="checkbox" id="${checkboxId}" name="categoryAllowedRoles" value="${role}" 
+                           class="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-400">
+                    <span>${role}</span>
+                `;
+                categoryRolePermissionsAdminContainer.appendChild(label);
+            });
+        }
+
 
         async function handleCreateCategory(e) {
             e.preventDefault();
@@ -1080,6 +1133,11 @@
             if (!name) {
                 showModal("O nome da categoria é obrigatório.", "error"); return;
             }
+
+            const selectedRoles = [];
+            const checkboxes = document.querySelectorAll('#category-role-permissions-admin-container input[name="categoryAllowedRoles"]:checked');
+            checkboxes.forEach(checkbox => selectedRoles.push(checkbox.value));
+
             try {
                 const userDisplayNameForActivity = userProfileData?.nickname || userProfileData?.displayName || (currentUser?.email?.split('@')[0] || "Sistema");
                 await addDoc(categoriesCol, {
@@ -1096,10 +1154,14 @@
                         userId: currentUserId, 
                         userDisplayName: userDisplayNameForActivity,
                         timestamp: Timestamp.now()
-                    }
+                    },
+                    allowedRoles: selectedRoles // Save the selected roles
                 });
                 showModal("Categoria criada com sucesso!", "success");
                 e.target.reset();
+                // Clear checkboxes in the form
+                document.querySelectorAll('#category-role-permissions-admin-container input[name="categoryAllowedRoles"]').forEach(cb => cb.checked = false);
+
             } catch (error) {
                 console.error("Error creating category:", error);
                 showModal("Erro ao criar categoria: " + error.message);
@@ -1125,17 +1187,39 @@
             if (unsubscribeCategories) unsubscribeCategories(); 
             unsubscribeCategories = onSnapshot(q, async (snapshot) => {
                 if (!currentUser) return; 
+                
+                const categoriesToShow = [];
                 if (snapshot.empty) {
                     categoriesList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhuma categoria encontrada. Que tal o administrador criar a primeira?</div>';
                     showView('forumHome');
                     return;
                 }
 
-                const userIdsForLastActivity = new Set();
                 snapshot.docs.forEach(doc => {
-                    const activityUserId = doc.data().lastActivityDetails?.userId;
+                    const category = doc.data();
+                    category.id = doc.id; // Add id to the category object for convenience
+                    if (isAdmin) {
+                        categoriesToShow.push(category);
+                    } else {
+                        const allowed = category.allowedRoles;
+                        if (!allowed || allowed.length === 0 || (userProfileData && allowed.includes(userProfileData.role))) {
+                            categoriesToShow.push(category);
+                        }
+                    }
+                });
+
+                if (categoriesToShow.length === 0 && !isAdmin) { // No public categories and user is not admin
+                     categoriesList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhuma categoria disponível para seu cargo.</div>';
+                     showView('forumHome');
+                     return;
+                }
+
+
+                const userIdsForLastActivity = new Set();
+                categoriesToShow.forEach(cat => {
+                    const activityUserId = cat.lastActivityDetails?.userId;
                     if (activityUserId) userIdsForLastActivity.add(activityUserId);
-                    const createdById = doc.data().createdBy; 
+                    const createdById = cat.createdBy; 
                     if (createdById) userIdsForLastActivity.add(createdById);
                 });
 
@@ -1157,21 +1241,20 @@
                     }
                 }
 
-                const sortedDocs = snapshot.docs.sort((a, b) => {
-                    const timeA = a.data().lastActivityDetails?.timestamp?.seconds || a.data().createdAt?.seconds || 0;
-                    const timeB = b.data().lastActivityDetails?.timestamp?.seconds || b.data().createdAt?.seconds || 0;
+                const sortedCategories = categoriesToShow.sort((a, b) => {
+                    const timeA = a.lastActivityDetails?.timestamp?.seconds || a.createdAt?.seconds || 0;
+                    const timeB = b.lastActivityDetails?.timestamp?.seconds || b.createdAt?.seconds || 0;
                     return timeB - timeA; 
                 }); 
 
                 let categoriesHtml = '';
-                sortedDocs.forEach(doc => {
-                    const category = doc.data();
+                sortedCategories.forEach(category => {
                     const lastActivity = category.lastActivityDetails;
                     let lastActivityHtml = 'Nenhuma atividade recente.';
                     if (lastActivity && lastActivity.topicId && lastActivity.topicTitle !== "Nenhum tópico ainda") {
                         const userName = activityUserProfiles[lastActivity.userId] || 'Desconhecido';
                         lastActivityHtml = `
-                            Último: <a href="#" class="text-blue-400 hover:underline" data-topic-id-link="${lastActivity.topicId}" data-topic-title-link="${lastActivity.topicTitle}" data-category-id-for-topic="${doc.id}" data-category-name-for-topic="${category.name}">${lastActivity.topicTitle}</a><br>
+                            Último: <a href="#" class="text-blue-400 hover:underline" data-topic-id-link="${lastActivity.topicId}" data-topic-title-link="${lastActivity.topicTitle}" data-category-id-for-topic="${category.id}" data-category-name-for-topic="${category.name}">${lastActivity.topicTitle}</a><br>
                             por ${userName}, ${formatTimestamp(lastActivity.timestamp)}
                         `;
                     } else if (lastActivity && lastActivity.userDisplayName) { 
@@ -1183,10 +1266,11 @@
                         <div class="bg-gray-800 p-4 rounded-lg shadow hover:shadow-xl transition-shadow duration-200">
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <h3 class="text-xl font-semibold text-blue-400 hover:text-blue-300 cursor-pointer category-link" data-id="${doc.id}" data-name="${category.name}">${category.name}</h3>
+                                    <h3 class="text-xl font-semibold text-blue-400 hover:text-blue-300 cursor-pointer category-link" data-id="${category.id}" data-name="${category.name}">${category.name}</h3>
                                     <p class="text-gray-400 text-sm mt-1">${category.description || 'Sem descrição.'}</p>
+                                    ${ (category.allowedRoles && category.allowedRoles.length > 0) ? `<p class="text-xs text-yellow-400 mt-1">Privado para: ${category.allowedRoles.join(', ')}</p>` : '<p class="text-xs text-green-400 mt-1">Público</p>'}
                                 </div>
-                                ${hasPermission(PERMISSIONS.MANAGE_CATEGORIES) ? `<button class="delete-category-btn text-red-500 hover:text-red-400 text-xs ml-2" data-id="${doc.id}" data-name="${category.name}">Excluir</button>` : ''}
+                                ${hasPermission(PERMISSIONS.MANAGE_CATEGORIES) ? `<button class="delete-category-btn text-red-500 hover:text-red-400 text-xs ml-2" data-id="${category.id}" data-name="${category.name}">Excluir</button>` : ''}
                             </div>
                             <div class="grid grid-cols-3 gap-2 text-xs text-gray-500 mt-3 pt-3 border-t border-gray-700">
                                 <div>Tópicos: ${category.topicCount || 0}</div>
@@ -1263,6 +1347,7 @@
 
         let currentCategoryName = '';
         let currentCategoryId = null;
+        let currentCategoryAllowedRoles = []; // Store allowed roles of the current category
 
         function openCreateTopicModal() {
             if (!hasPermission(PERMISSIONS.CREATE_TOPIC)) {
@@ -1300,6 +1385,10 @@
             const now = Timestamp.now();
             const userDisplayName = userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0];
             
+            // For now, topics inherit category's allowedRoles.
+            // Later, we can add UI to set topic-specific roles.
+            const topicAllowedRoles = currentCategoryAllowedRoles; // Inherit from category
+
             try {
                 const topicRef = await addDoc(topicsCol, {
                     categoryId: currentCategoryId,
@@ -1312,7 +1401,8 @@
                     lastReplyAt: now,
                     lastReplyBy: currentUserId,
                     lastReplyByDisplayName: userDisplayName,
-                    viewCount: 0
+                    viewCount: 0,
+                    allowedRoles: topicAllowedRoles // Save inherited or topic-specific roles
                 });
 
                 await addDoc(postsCol, {
@@ -1361,24 +1451,52 @@
             currentCategoryName = categoryName;
             categoryTitle.textContent = categoryName;
             updateBreadcrumbs([{name: categoryName, view: 'category', id: categoryId}]);
+
+            // Fetch the category to check its permissions first
+            const categoryRef = doc(categoriesCol, categoryId);
+            const categorySnap = await getDoc(categoryRef);
+            if (!categorySnap.exists()) {
+                showModal("Categoria não encontrada.", "error");
+                showView('forumHome');
+                return;
+            }
+            const categoryData = categorySnap.data();
+            currentCategoryAllowedRoles = categoryData.allowedRoles || []; // Store for topic creation
+
+            if (!isAdmin && currentCategoryAllowedRoles.length > 0 && !currentCategoryAllowedRoles.includes(userProfileData?.role)) {
+                topicsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Você não tem permissão para ver os tópicos desta categoria.</div>';
+                showView('category');
+                return;
+            }
             
             topicsList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando tópicos...</p>';
+            // Topics will inherit category's allowedRoles if they don't have their own (future feature)
+            // For now, all topics in a visible category are visible to those who can see the category.
             const q = query(topicsCol, where("categoryId", "==", categoryId)); 
             
             if (unsubscribeTopics) unsubscribeTopics();
             unsubscribeTopics = onSnapshot(q, async (snapshot) => {
                 if (!currentUser) return;
-                if (snapshot.empty) {
+                
+                const topicsToShow = [];
+                snapshot.docs.forEach(doc => {
+                    const topic = doc.data();
+                    topic.id = doc.id;
+                    // Future: Add topic-specific allowedRoles check here, falling back to category's
+                    topicsToShow.push(topic); 
+                });
+
+                if (topicsToShow.length === 0) {
                     topicsList.innerHTML = '<div class="p-6 text-center text-gray-400 bg-gray-800 rounded-lg shadow">Nenhum tópico encontrado nesta categoria. Seja o primeiro a criar um!</div>';
                     showView('category');
                     return;
                 }
 
+
                 const userIds = new Set();
-                snapshot.docs.forEach(doc => {
-                    const data = doc.data();
-                    if(data.createdBy) userIds.add(data.createdBy);
-                    if(data.lastReplyBy) userIds.add(data.lastReplyBy);
+                topicsToShow.forEach(topic => {
+                    if(topic.createdBy) userIds.add(topic.createdBy);
+                    if(topic.lastReplyBy) userIds.add(topic.lastReplyBy);
                 });
 
                 const profiles = {};
@@ -1400,27 +1518,26 @@
                     } catch (err) { console.error("Error fetching user profiles for topics:", err); }
                 }
                 
-                const sortedDocs = snapshot.docs.sort((a,b) => {
-                    const timeA = a.data().lastReplyAt?.seconds || a.data().createdAt?.seconds || 0;
-                    const timeB = b.data().lastReplyAt?.seconds || b.data().createdAt?.seconds || 0;
+                const sortedDocs = topicsToShow.sort((a,b) => { // Sort the filtered topics
+                    const timeA = a.lastReplyAt?.seconds || a.createdAt?.seconds || 0;
+                    const timeB = b.lastReplyAt?.seconds || b.createdAt?.seconds || 0;
                     return timeB - timeA;
                 });
 
                 let topicsHtml = '';
-                sortedDocs.forEach(doc => {
-                    const topic = doc.data();
+                sortedDocs.forEach(topic => {
                     const createdByDisplayName = profiles[topic.createdBy]?.displayName || topic.userDisplayName || 'Desconhecido';
                     const lastReplyByDisplayName = profiles[topic.lastReplyBy]?.displayName || topic.lastReplyByDisplayName || 'N/A';
                     
                     let deleteBtnHtml = '';
                     if (hasPermission(PERMISSIONS.DELETE_ANY_TOPIC) || (hasPermission(PERMISSIONS.DELETE_OWN_TOPIC) && currentUser.uid === topic.createdBy)) {
-                        deleteBtnHtml = `<button class="delete-topic-btn text-red-500 hover:text-red-400 text-xs ml-2 self-start p-1" data-id="${doc.id}" data-title="${topic.title}">Excluir</button>`;
+                        deleteBtnHtml = `<button class="delete-topic-btn text-red-500 hover:text-red-400 text-xs ml-2 self-start p-1" data-id="${topic.id}" data-title="${topic.title}">Excluir</button>`;
                     }
 
                     topicsHtml += `
                         <div class="bg-gray-800 p-4 rounded-lg shadow flex justify-between items-center hover:bg-gray-700 transition-colors duration-150 topic-link-container">
                             <div class="flex-grow">
-                                <h4 class="text-lg font-medium text-blue-400 hover:text-blue-300 cursor-pointer topic-title-link" data-id="${doc.id}" data-title="${topic.title}">${topic.title}</h4>
+                                <h4 class="text-lg font-medium text-blue-400 hover:text-blue-300 cursor-pointer topic-title-link" data-id="${topic.id}" data-title="${topic.title}">${topic.title}</h4>
                                 <p class="text-xs text-gray-500">
                                     Criado por: <a href="#" class="text-blue-300 hover:underline user-profile-link" data-userid="${topic.createdBy}">${createdByDisplayName}</a> (${formatTimestamp(topic.createdAt)})
                                 </p>
@@ -1622,7 +1739,6 @@
             if (document.getElementById('topic-poll-container')) document.getElementById('topic-poll-container').innerHTML = ''; 
 
             postsList.innerHTML = '<div class="loading-spinner"></div><p class="text-gray-400 text-center">Carregando postagens...</p>';
-            // Modified query: Removed orderBy("createdAt", "asc")
             const q = query(postsCol, where("topicId", "==", topicId)); 
 
             if(unsubscribePosts) unsubscribePosts();
@@ -1660,16 +1776,15 @@
                     } catch (err) { console.error("Error fetching user profiles for posts:", err); }
                 }
                 
-                // Client-side sorting
                 const docsToSort = [...snapshot.docs];
                 const sortedDocs = docsToSort.sort((a,b) => {
                     const timeA = a.data().createdAt?.seconds || 0;
                     const timeB = b.data().createdAt?.seconds || 0;
-                    return timeA - timeB; // Ascending order
+                    return timeA - timeB; 
                 });
 
                 let postsHtml = '';
-                sortedDocs.forEach((postDoc, index) => { // Iterate over sortedDocs
+                sortedDocs.forEach((postDoc, index) => { 
                     const post = postDoc.data();
                     const userProfile = profiles[post.userId];
                     const displayName = userProfile?.displayName || post.userDisplayName || 'Desconhecido';
@@ -2135,6 +2250,7 @@
                     if (isAdmin && adminControls && adminControls.style.display === 'block') {
                         loadRolePermissionsSettings(); 
                         loadRoleColorSettings(); 
+                        populateCategoryRolePermissionsCheckboxes(); // Also populate here when server config updates
                     }
                     console.log("[Client] Server config loaded/updated via listener. Reg Open:", registrationsOpen);
 
@@ -2469,6 +2585,7 @@
             <nav class="space-x-2 sm:space-x-4 text-sm sm:text-base">
                 <span id="user-display" class="text-sm"></span>
                 <span id="current-user-id-display" class="text-xs text-gray-400" style="display:none;"></span>
+                <a href="#" id="admin-panel-nav" class="text-yellow-400 hover:text-yellow-300" style="display:none;">Painel Admin</a>
                 <a href="#" id="my-profile-nav" class="text-blue-400 hover:text-blue-300" style="display:none;">Meu Perfil</a>
                 <a href="#" id="login-nav" class="text-blue-400 hover:text-blue-300">Login</a>
                 <a href="#" id="register-nav" class="text-blue-400 hover:text-blue-300" style="display:none;">Registrar</a>
@@ -2527,80 +2644,86 @@
         </div>
 
         <div id="forum-home-view" class="view">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div class="md:col-span-3">
-                    <div id="admin-controls" style="display:none;" class="mb-6 bg-gray-800 p-6 rounded-lg shadow-md">
-                        <h3 class="text-2xl font-bold mb-6 text-yellow-500 border-b border-gray-700 pb-3">Painel do Administrador</h3>
-                        
-                        <div class="admin-section">
-                            <h4 class="admin-section-title">Configurações Gerais do Fórum</h4>
-                            <div class="space-y-4">
-                                <div>
-                                    <label for="admin-forum-name" class="block text-sm font-medium text-gray-300 mb-1">Nome do Fórum</label>
-                                    <input type="text" id="admin-forum-name" class="w-full p-2 bg-gray-600 border border-gray-500 rounded-md text-gray-100 placeholder-gray-400">
-                                </div>
-                                 <div class="flex items-center">
-                                    <label for="admin-registrations-toggle" class="block text-sm font-medium text-gray-300 mr-3">Permitir Novos Cadastros:</label>
-                                    <label class="toggle-switch">
-                                        <input type="checkbox" id="admin-registrations-toggle">
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <div class="flex space-x-3">
-                                    <button id="save-forum-name-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Nome</button>
-                                    <button id="save-registration-settings-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Config. Cadastro</button>
-                                </div>
-                            </div>
+            <div id="admin-controls" class="mb-6 bg-gray-800 p-6 rounded-lg shadow-md">
+                <h3 class="text-2xl font-bold mb-6 text-yellow-500 border-b border-gray-700 pb-3">Painel do Administrador</h3>
+                
+                <div class="admin-section">
+                    <h4 class="admin-section-title">Configurações Gerais do Fórum</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="admin-forum-name" class="block text-sm font-medium text-gray-300 mb-1">Nome do Fórum</label>
+                            <input type="text" id="admin-forum-name" class="w-full p-2 bg-gray-600 border border-gray-500 rounded-md text-gray-100 placeholder-gray-400">
                         </div>
-
-                        <div class="admin-section">
-                            <h4 class="admin-section-title">Criar Nova Categoria</h4>
-                            <form id="create-category-form" class="space-y-4">
-                                <div>
-                                    <label for="category-name" class="block text-sm font-medium text-gray-300 mb-1">Nome da Categoria</label>
-                                    <input type="text" id="category-name" name="name" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400">
-                                </div>
-                                <div class="mb-2">
-                                    <label for="category-description" class="block text-sm font-medium text-gray-300 mb-1">Descrição</label>
-                                    <textarea id="category-description" name="description" rows="2" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400"></textarea>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-2 px-4 rounded-md transition duration-150">Criar Categoria</button>
-                                    <button type="button" id="generate-category-description-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-md transition duration-150 text-sm">
-                                        Gerar Descrição com IA ✨
-                                    </button>
-                                    <div id="generate-category-desc-spinner" class="gemini-loading-spinner" style="display:none;"></div>
-                                </div>
-                            </form>
+                         <div class="flex items-center">
+                            <label for="admin-registrations-toggle" class="block text-sm font-medium text-gray-300 mr-3">Permitir Novos Cadastros:</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="admin-registrations-toggle">
+                                <span class="slider"></span>
+                            </label>
                         </div>
-
-                        <div class="admin-section">
-                            <h4 class="admin-section-title">Configurar Servidores CS2</h4>
-                            <div id="cs-servers-list-admin" class="space-y-2 mb-3">
-                            </div>
-                            <button id="add-cs-server-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Adicionar Servidor CS2</button>
-                        </div>
-
-                        <div class="admin-section">
-                            <h4 class="admin-section-title">Configurações de Cores dos Cargos</h4>
-                            <div id="admin-role-color-settings" class="space-y-2">
-                            </div>
-                            <button id="save-role-colors-btn" class="mt-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Cores dos Cargos</button>
-                        </div>
-                        
-                        <div class="admin-section">
-                            <h4 class="admin-section-title">Permissões dos Cargos</h4>
-                            <div id="admin-permissions-settings" class="space-y-4">
-                            </div>
-                            <button id="save-permissions-btn" class="mt-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Permissões</button>
-                        </div>
-
-                        <div class="admin-section">
-                            <h4 class="admin-section-title">Gerenciamento de Usuários</h4>
-                            <div id="admin-user-list" class="space-y-3 max-h-96 overflow-y-auto">
-                            </div>
+                        <div class="flex space-x-3">
+                            <button id="save-forum-name-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Nome</button>
+                            <button id="save-registration-settings-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Config. Cadastro</button>
                         </div>
                     </div>
+                </div>
+
+                <div class="admin-section">
+                    <h4 class="admin-section-title">Criar Nova Categoria</h4>
+                    <form id="create-category-form" class="space-y-4">
+                        <div>
+                            <label for="category-name" class="block text-sm font-medium text-gray-300 mb-1">Nome da Categoria</label>
+                            <input type="text" id="category-name" name="name" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400">
+                        </div>
+                        <div class="mb-2">
+                            <label for="category-description" class="block text-sm font-medium text-gray-300 mb-1">Descrição</label>
+                            <textarea id="category-description" name="description" rows="2" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400"></textarea>
+                        </div>
+                        <div id="category-role-permissions-admin-container" class="mt-2 mb-2">
+                            <label class="block text-sm font-medium text-gray-300 mb-1">Permitir visualização para os cargos (deixe desmarcado para público):</label>
+                            <div class="space-y-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-2 px-4 rounded-md transition duration-150">Criar Categoria</button>
+                            <button type="button" id="generate-category-description-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-md transition duration-150 text-sm">
+                                Gerar Descrição com IA ✨
+                            </button>
+                            <div id="generate-category-desc-spinner" class="gemini-loading-spinner" style="display:none;"></div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="admin-section">
+                    <h4 class="admin-section-title">Configurar Servidores CS2</h4>
+                    <div id="cs-servers-list-admin" class="space-y-2 mb-3">
+                    </div>
+                    <button id="add-cs-server-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Adicionar Servidor CS2</button>
+                </div>
+
+                <div class="admin-section">
+                    <h4 class="admin-section-title">Configurações de Cores dos Cargos</h4>
+                    <div id="admin-role-color-settings" class="space-y-2">
+                    </div>
+                    <button id="save-role-colors-btn" class="mt-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Cores dos Cargos</button>
+                </div>
+                
+                <div class="admin-section">
+                    <h4 class="admin-section-title">Permissões dos Cargos</h4>
+                    <div id="admin-permissions-settings" class="space-y-4">
+                    </div>
+                    <button id="save-permissions-btn" class="mt-3 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md transition duration-150">Salvar Permissões</button>
+                </div>
+
+                <div class="admin-section">
+                    <h4 class="admin-section-title">Gerenciamento de Usuários</h4>
+                    <div id="admin-user-list" class="space-y-3 max-h-96 overflow-y-auto">
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="md:col-span-3">
                     <h2 class="text-2xl font-semibold mb-6 text-blue-400">Categorias</h2>
                     <div id="categories-list" class="space-y-4">
                     </div>
