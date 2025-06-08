@@ -2458,7 +2458,7 @@
                     const displayName = userProfile?.displayName || post.userDisplayName || 'Desconhecido';
                     const userRole = userProfile?.role || 'Membro'; 
                     const roleColor = currentRoleColors[userRole] || '#6b7280'; // Default color if role/color not found
-                    const postContent = post.content ? post.content.replace(/\n/g, '<br>') : ""; // Preserve line breaks
+                    const postContent = post.content ? parseLinks(post.content.replace(/\n/g, '<br>')) : ""; // Preserve line breaks
 
                     // Command button for the first post if commandToCopy exists
                     let commandButtonHtml = '';
@@ -2468,14 +2468,18 @@
                             if (post.commands.length > 0 && typeof post.commands[0] === 'object' && post.commands[0] !== null && 'value' in post.commands[0]) {
                                 commandsArr = post.commands;
                             } else {
-                                commandsArr = post.commands.map(cmd => ({ label: '', value: cmd }));
+                                commandsArr = post.commands.map(cmd => ({ type: 'command', label: '', value: cmd }));
                             }
                         } else if (typeof post.commandToCopy === 'string' && post.commandToCopy.trim() !== '') {
-                            commandsArr = [{ label: '', value: post.commandToCopy }];
+                            commandsArr = [{ type: 'command', label: '', value: post.commandToCopy }];
                         }
                         commandsArr.forEach((cmdObj, idx) => {
-                            const label = cmdObj.label ? `(${cmdObj.label})` : (commandsArr.length > 1 ? `#${idx+1}` : '');
-                            commandButtonHtml += `<button class="copy-post-command-btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded-md mt-2 mr-2" data-command="${cmdObj.value}">Copiar Comando ${label}</button>`;
+                            const label = cmdObj.label ? cmdObj.label : (commandsArr.length > 1 ? `#${idx+1}` : '');
+                            if (cmdObj.type === 'link') {
+                                commandButtonHtml += `<a href="${cmdObj.value}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 px-2 rounded-md mt-2 mr-2 transition-colors duration-150"><svg xmlns='http://www.w3.org/2000/svg' class='h-4 w-4 mr-1' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13.828 10.172a4 4 0 010 5.656m1.415-1.415a6 6 0 10-8.486-8.486 6 6 0 008.486 8.486z' /></svg>LINK ${label || 'Acessar'}</a>`;
+                            } else {
+                                commandButtonHtml += `<button class="copy-post-command-btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded-md mt-2 mr-2" data-command="${cmdObj.value}">Copiar Comando ${label ? '('+label+')' : ''}</button>`;
+                            }
                         });
                     }
                     
@@ -2618,21 +2622,25 @@
             commandsContainer.innerHTML = '';
             let commandsArr = [];
             if (Array.isArray(currentCommands)) {
-                // Detecta se já é array de objetos {label, value} ou só strings
-                if (currentCommands.length > 0 && typeof currentCommands[0] === 'object' && currentCommands[0] !== null && 'value' in currentCommands[0]) {
-                    commandsArr = currentCommands;
+                // Detecta se já é array de objetos {type, label, value} ou só strings/objetos antigos
+                if (currentCommands.length > 0 && typeof currentCommands[0] === 'object' && 'value' in currentCommands[0]) {
+                    commandsArr = currentCommands.map(cmd => ({
+                        type: cmd.type || 'command',
+                        label: cmd.label || '',
+                        value: cmd.value || ''
+                    }));
                 } else {
                     // Array de strings, converter para objetos
-                    commandsArr = currentCommands.map(cmd => ({ label: '', value: cmd }));
+                    commandsArr = currentCommands.map(cmd => ({ type: 'command', label: '', value: cmd }));
                 }
             } else if (typeof currentCommands === 'string' && currentCommands.trim() !== '') {
-                commandsArr = [{ label: '', value: currentCommands }];
+                commandsArr = [{ type: 'command', label: '', value: currentCommands }];
             }
             commandsArr.forEach(cmdObj => {
-                addEditPostCommandField(cmdObj.label || '', cmdObj.value || '');
+                addEditPostCommandField(cmdObj.label, cmdObj.value, cmdObj.type);
             });
             if (commandsArr.length === 0) {
-                addEditPostCommandField('', '');
+                addEditPostCommandField('', '', 'command');
             }
             editPostModal.style.display = 'flex';
         }
@@ -2641,25 +2649,41 @@
          * Adiciona um campo de comando no modal de edição de post.
          * @param {string} value - Valor inicial do campo.
          */
-        function addEditPostCommandField(label = '', value = '') {
+        function addEditPostCommandField(label = '', value = '', type = 'command') {
             const commandsContainer = document.getElementById('edit-post-commands-container');
             const div = document.createElement('div');
             div.className = 'flex space-x-2 items-center';
+            // Tipo: comando ou link
+            const selectType = document.createElement('select');
+            selectType.className = 'p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100';
+            const optionCommand = document.createElement('option');
+            optionCommand.value = 'command';
+            optionCommand.textContent = 'Comando';
+            const optionLink = document.createElement('option');
+            optionLink.value = 'link';
+            optionLink.textContent = 'Link';
+            selectType.appendChild(optionCommand);
+            selectType.appendChild(optionLink);
+            selectType.value = type;
+            // Label
             const inputLabel = document.createElement('input');
             inputLabel.type = 'text';
             inputLabel.className = 'w-1/3 p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400';
-            inputLabel.placeholder = 'Nome do comando (opcional)';
+            inputLabel.placeholder = 'Nome do botão (opcional)';
             inputLabel.value = label;
+            // Valor
             const inputValue = document.createElement('input');
             inputValue.type = 'text';
             inputValue.className = 'w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400';
-            inputValue.placeholder = 'Ex: connect seu.ip.aqui:porta';
+            inputValue.placeholder = 'Comando ou URL';
             inputValue.value = value;
+            // Remover
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.className = 'bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md text-xs';
             removeBtn.textContent = 'Remover';
             removeBtn.onclick = () => div.remove();
+            div.appendChild(selectType);
             div.appendChild(inputLabel);
             div.appendChild(inputValue);
             div.appendChild(removeBtn);
@@ -2700,15 +2724,21 @@
             const divs = commandsContainer.querySelectorAll('div');
             const commandsArr = [];
             for (const div of divs) {
+                const selectType = div.querySelector('select');
                 const inputs = div.querySelectorAll('input');
+                const type = selectType ? selectType.value : 'command';
                 const label = inputs[0].value.trim();
                 const value = inputs[1].value.trim();
                 if (value) {
-                    if (containsProhibitedCode(value)) {
+                    if (type === 'command' && containsProhibitedCode(value)) {
                         showModal("Um dos comandos contém código proibido (HTML/JavaScript).", "error");
                         return;
                     }
-                    commandsArr.push({ label, value });
+                    if (type === 'link' && !/^https?:\/\//i.test(value)) {
+                        showModal("Um dos links não é uma URL válida.", "error");
+                        return;
+                    }
+                    commandsArr.push({ type, label, value });
                 }
             }
             try {
@@ -3546,6 +3576,72 @@
             return forbiddenPattern.test(text);
         }
 
+        // Adicionar após o DOMContentLoaded:
+        // --- Comandos/Links no modal de criação de tópico ---
+        const newTopicCommandsContainer = document.getElementById('new-topic-commands-container');
+        const addNewTopicCommandBtn = document.getElementById('add-new-topic-command-btn');
+        function addNewTopicCommandField(label = '', value = '', type = 'command') {
+            const div = document.createElement('div');
+            div.className = 'flex space-x-2 items-center';
+            const selectType = document.createElement('select');
+            selectType.className = 'p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100';
+            const optionCommand = document.createElement('option');
+            optionCommand.value = 'command';
+            optionCommand.textContent = 'Comando';
+            const optionLink = document.createElement('option');
+            optionLink.value = 'link';
+            optionLink.textContent = 'Link';
+            selectType.appendChild(optionCommand);
+            selectType.appendChild(optionLink);
+            selectType.value = type;
+            const inputLabel = document.createElement('input');
+            inputLabel.type = 'text';
+            inputLabel.className = 'w-1/3 p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400';
+            inputLabel.placeholder = 'Nome do botão (opcional)';
+            inputLabel.value = label;
+            const inputValue = document.createElement('input');
+            inputValue.type = 'text';
+            inputValue.className = 'w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400';
+            inputValue.placeholder = 'Comando ou URL';
+            inputValue.value = value;
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md text-xs';
+            removeBtn.textContent = 'Remover';
+            removeBtn.onclick = () => div.remove();
+            div.appendChild(selectType);
+            div.appendChild(inputLabel);
+            div.appendChild(inputValue);
+            div.appendChild(removeBtn);
+            newTopicCommandsContainer.appendChild(div);
+        }
+        if (addNewTopicCommandBtn) {
+            addNewTopicCommandBtn.onclick = () => addNewTopicCommandField('', '', 'command');
+        }
+        // Ao abrir o modal, limpar e adicionar um campo vazio
+        const showCreateTopicModalBtn = document.getElementById('show-create-topic-modal');
+        if (showCreateTopicModalBtn) {
+            showCreateTopicModalBtn.addEventListener('click', () => {
+                if (newTopicCommandsContainer) {
+                    newTopicCommandsContainer.innerHTML = '';
+                    addNewTopicCommandField('', '', 'command');
+                }
+            });
+        }
+
+        // Função utilitária para transformar URLs e [texto](url) em links
+        function parseLinks(text) {
+            if (!text) return '';
+            // Primeiro, markdown [texto](url)
+            text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline hover:text-blue-300">$1</a>');
+            // Depois, URLs "soltas"
+            text = text.replace(/(https?:\/\/[^\s<]+)/g, function(url) {
+                // Evita duplo link se já está dentro de <a>
+                if (/href=/.test(url)) return url;
+                return '<a href="' + url + '" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline hover:text-blue-300">' + url + '</a>';
+            });
+            return text;
+        }
     </script>
 
     <header class="bg-gray-800 shadow-md p-4">
@@ -3876,9 +3972,9 @@
             <h3 class="text-xl font-semibold mb-4 text-blue-400">Editar Postagem</h3>
             <textarea id="edit-post-content" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 mb-4"></textarea>
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-300 mb-1">Comandos para Copiar (opcional)</label>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Comandos ou Links (opcional)</label>
                 <div id="edit-post-commands-container" class="space-y-2"></div>
-                <button type="button" id="add-edit-post-command-btn" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-sm">Adicionar Comando</button>
+                <button type="button" id="add-edit-post-command-btn" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-sm">Adicionar</button>
             </div>
             <div class="flex justify-end space-x-3">
                 <button type="button" id="cancel-edit-post-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-md">Cancelar</button>
