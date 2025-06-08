@@ -1933,13 +1933,17 @@
                 });
 
                 // 2. Create the first post for this topic
+                const commandToCopy = newTopicCommandInput.value.trim(); // Comando principal
+                let commandsArr = [];
+                if (commandToCopy) commandsArr.push(commandToCopy);
+                // Aqui você pode adicionar lógica para múltiplos comandos se quiser expandir o formulário depois
                 await addDoc(postsCol, {
                     topicId: topicRef.id,
                     userId: currentUserId,
                     userDisplayName: userDisplayName,
                     content,
                     createdAt: now,
-                    commandToCopy: commandToCopy || null // Store command if provided
+                    commands: commandsArr
                 });
                 
                 // 3. Update category metadata (topic count, post count, last activity)
@@ -2458,8 +2462,21 @@
 
                     // Command button for the first post if commandToCopy exists
                     let commandButtonHtml = '';
-                    if (index === 0 && post.commandToCopy) { 
-                        commandButtonHtml = `<button class="copy-post-command-btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded-md mt-2" data-command="${post.commandToCopy}">Copiar Comando</button>`;
+                    if (index === 0) {
+                        let commandsArr = [];
+                        if (Array.isArray(post.commands)) {
+                            if (post.commands.length > 0 && typeof post.commands[0] === 'object' && post.commands[0] !== null && 'value' in post.commands[0]) {
+                                commandsArr = post.commands;
+                            } else {
+                                commandsArr = post.commands.map(cmd => ({ label: '', value: cmd }));
+                            }
+                        } else if (typeof post.commandToCopy === 'string' && post.commandToCopy.trim() !== '') {
+                            commandsArr = [{ label: '', value: post.commandToCopy }];
+                        }
+                        commandsArr.forEach((cmdObj, idx) => {
+                            const label = cmdObj.label ? `(${cmdObj.label})` : (commandsArr.length > 1 ? `#${idx+1}` : '');
+                            commandButtonHtml += `<button class="copy-post-command-btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded-md mt-2 mr-2" data-command="${cmdObj.value}">Copiar Comando ${label}</button>`;
+                        });
                     }
                     
                     // Edit/Delete actions for posts
@@ -2501,7 +2518,7 @@
                         const postRef = doc(postsCol, postId);
                         const postSnap = await getDoc(postRef);
                         if (postSnap.exists()) {
-                            openEditPostModal(postId, postSnap.data().content); // Open modal with post content
+                            openEditPostModal(postId, postSnap.data().content, postSnap.data().commands || postSnap.data().commandToCopy || null); // Open modal with post content and commands
                         } else {
                             showModal("Post não encontrado para editar.", "error");
                         }
@@ -2588,19 +2605,75 @@
 
         // --- Edit Post Functionality ---
         /**
-         * Opens the modal to edit a post.
-         * @param {string} postId - The ID of the post to edit.
-         * @param {string} currentContent - The current content of the post.
+         * Abre o modal para editar um post, incluindo múltiplos comandos.
+         * @param {string} postId - O ID do post a editar.
+         * @param {string} currentContent - O conteúdo atual do post.
+         * @param {Array<string>|string|null} currentCommands - Os comandos atuais do post (array, string ou null).
          */
-        function openEditPostModal(postId, currentContent) {
+        function openEditPostModal(postId, currentContent, currentCommands = null) {
             if (!editPostModal || !editPostContentInput) return;
             editingPostId = postId; // Store globally for save function
             editPostContentInput.value = currentContent; // Populate textarea
-            editPostModal.style.display = 'flex'; // Show modal
+            const commandsContainer = document.getElementById('edit-post-commands-container');
+            commandsContainer.innerHTML = '';
+            let commandsArr = [];
+            if (Array.isArray(currentCommands)) {
+                // Detecta se já é array de objetos {label, value} ou só strings
+                if (currentCommands.length > 0 && typeof currentCommands[0] === 'object' && currentCommands[0] !== null && 'value' in currentCommands[0]) {
+                    commandsArr = currentCommands;
+                } else {
+                    // Array de strings, converter para objetos
+                    commandsArr = currentCommands.map(cmd => ({ label: '', value: cmd }));
+                }
+            } else if (typeof currentCommands === 'string' && currentCommands.trim() !== '') {
+                commandsArr = [{ label: '', value: currentCommands }];
+            }
+            commandsArr.forEach(cmdObj => {
+                addEditPostCommandField(cmdObj.label || '', cmdObj.value || '');
+            });
+            if (commandsArr.length === 0) {
+                addEditPostCommandField('', '');
+            }
+            editPostModal.style.display = 'flex';
         }
 
         /**
-         * Saves the edited content of a post.
+         * Adiciona um campo de comando no modal de edição de post.
+         * @param {string} value - Valor inicial do campo.
+         */
+        function addEditPostCommandField(label = '', value = '') {
+            const commandsContainer = document.getElementById('edit-post-commands-container');
+            const div = document.createElement('div');
+            div.className = 'flex space-x-2 items-center';
+            const inputLabel = document.createElement('input');
+            inputLabel.type = 'text';
+            inputLabel.className = 'w-1/3 p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400';
+            inputLabel.placeholder = 'Nome do comando (opcional)';
+            inputLabel.value = label;
+            const inputValue = document.createElement('input');
+            inputValue.type = 'text';
+            inputValue.className = 'w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400';
+            inputValue.placeholder = 'Ex: connect seu.ip.aqui:porta';
+            inputValue.value = value;
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md text-xs';
+            removeBtn.textContent = 'Remover';
+            removeBtn.onclick = () => div.remove();
+            div.appendChild(inputLabel);
+            div.appendChild(inputValue);
+            div.appendChild(removeBtn);
+            commandsContainer.appendChild(div);
+        }
+
+        // Botão para adicionar novo campo de comando
+        const addEditPostCommandBtn = document.getElementById('add-edit-post-command-btn');
+        if (addEditPostCommandBtn) {
+            addEditPostCommandBtn.onclick = () => addEditPostCommandField('', '');
+        }
+
+        /**
+         * Salva o conteúdo e comandos editados do post.
          */
         async function saveEditedPost() {
             if (!editingPostId || !editPostContentInput || !editPostModal) return;
@@ -2610,12 +2683,9 @@
                 showModal("Post não encontrado para editar.", "error"); return;
             }
             const postData = postSnap.data();
-
-            // Permission check for editing post
             if (!hasPermission(PERMISSIONS.EDIT_ANY_POST) && !(hasPermission(PERMISSIONS.EDIT_OWN_POST) && currentUser.uid === postData.userId)) {
                 showModal("Você não tem permissão para editar este post.", "error"); return;
             }
-
             const newContent = editPostContentInput.value.trim();
             if (!newContent) {
                 showModal("O conteúdo do post não pode ficar vazio.", "error");
@@ -2625,17 +2695,34 @@
                 showModal("O conteúdo editado contém código proibido (HTML/JavaScript). Por favor, envie apenas texto.", "error");
                 return;
             }
+            // Pegar comandos
+            const commandsContainer = document.getElementById('edit-post-commands-container');
+            const divs = commandsContainer.querySelectorAll('div');
+            const commandsArr = [];
+            for (const div of divs) {
+                const inputs = div.querySelectorAll('input');
+                const label = inputs[0].value.trim();
+                const value = inputs[1].value.trim();
+                if (value) {
+                    if (containsProhibitedCode(value)) {
+                        showModal("Um dos comandos contém código proibido (HTML/JavaScript).", "error");
+                        return;
+                    }
+                    commandsArr.push({ label, value });
+                }
+            }
             try {
                 await updateDoc(postRef, {
                     content: newContent,
+                    commands: commandsArr,
                     lastEditedAt: Timestamp.now(),
-                    lastEditedBy: currentUserId, // Track who edited
-                    lastEditedByDisplayName: userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0]
+                    lastEditedBy: currentUserId,
+                    lastEditedByDisplayName: userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0],
+                    commandToCopy: null
                 });
                 showModal("Post atualizado com sucesso!", "success");
-                editPostModal.style.display = 'none'; // Close modal
-                editingPostId = null; // Clear global ID
-                // Post list will update via its onSnapshot listener.
+                editPostModal.style.display = 'none';
+                editingPostId = null;
             } catch (error) {
                 console.error("Error updating post:", error);
                 showModal("Erro ao atualizar post: " + error.message, "error");
@@ -3788,6 +3875,11 @@
         <div class="modal-content bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-semibold mb-4 text-blue-400">Editar Postagem</h3>
             <textarea id="edit-post-content" rows="8" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 mb-4"></textarea>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-300 mb-1">Comandos para Copiar (opcional)</label>
+                <div id="edit-post-commands-container" class="space-y-2"></div>
+                <button type="button" id="add-edit-post-command-btn" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-sm">Adicionar Comando</button>
+            </div>
             <div class="flex justify-end space-x-3">
                 <button type="button" id="cancel-edit-post-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-md">Cancelar</button>
                 <button type="button" id="save-edit-post-btn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md">Salvar Edição</button>
