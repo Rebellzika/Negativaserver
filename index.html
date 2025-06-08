@@ -391,6 +391,29 @@
         @media (max-width: 640px) {
             #chat-messages { height: 120px; font-size: 0.95rem; }
         }
+        .cs-banner-btn {
+            min-height: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 8px;
+            background: #3b82f6;
+            color: #fff;
+            transition: background 0.15s;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            box-sizing: border-box;
+        }
+        .cs-banner-btn:hover, .cs-banner-btn:focus {
+            background: #2563eb;
+            color: #fff;
+            outline: 2px solid #facc15;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100">
@@ -569,6 +592,8 @@
             editTopicRolePermissionsContainer, saveEditTopicBtn, cancelEditTopicBtn,
             registerPromptContainer; // Added for the registration link on the login page
 
+        // Adicionar variáveis DOM
+        let csServerBtnLabelInput, csServerShowBtnInput;
 
         // --- Utility Functions ---
         /**
@@ -754,6 +779,9 @@
 
             // Registration link container on login page
             registerPromptContainer = document.getElementById('register-prompt-container');
+
+            csServerBtnLabelInput = document.getElementById('cs-server-btn-label');
+            csServerShowBtnInput = document.getElementById('cs-server-show-btn');
         }
 
         // --- Event Listeners Setup (DOM Ready) ---
@@ -1325,10 +1353,14 @@
             servers.forEach((server, index) => {
                 const serverDiv = document.createElement('div');
                 serverDiv.className = 'bg-gray-700 p-2 rounded-md mb-2 flex justify-between items-center';
+                const btnLabel = server.buttonLabel && server.buttonLabel.trim() ? server.buttonLabel : (server.connectCommand && server.connectCommand.startsWith('http') ? 'Acessar' : 'Copiar Comando');
                 serverDiv.innerHTML = `
                     <div>
                         <p class="text-sm font-medium">${server.displayName || 'Servidor sem nome'}</p>
                         <p class="text-xs text-gray-400">${server.connectCommand || 'Comando não definido'}</p>
+                        <p class="text-xs mt-1">
+                            <span class="${server.showButton === false ? 'text-red-400' : 'text-green-400'} font-semibold">Botão: ${server.showButton === false ? 'Desativado' : btnLabel}</span>
+                        </p>
                     </div>
                     <div>
                         <button class="edit-cs-server-btn text-yellow-400 hover:text-yellow-300 text-xs mr-2" data-index="${index}">Editar</button>
@@ -1337,8 +1369,6 @@
                 `;
                 csServersListAdmin.appendChild(serverDiv);
             });
-
-            // Add event listeners for edit/delete buttons
             csServersListAdmin.querySelectorAll('.edit-cs-server-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => openCsServerModal(parseInt(e.target.dataset.index)));
             });
@@ -1352,18 +1382,23 @@
          * @param {number|null} index - The index of the server to edit, or null to add a new one.
          */
         async function openCsServerModal(index = null) {
-            if (!csServerForm || !csServerModal || !csServerIdInput || !csServerNameInput || !csServerConnectInput) return;
-            csServerForm.reset(); // Clear form fields
-            csServerIdInput.value = index !== null ? index : ''; // Store index if editing
-            if (index !== null) { // If editing, load existing server data
-                const docSnap = await getDoc(serverConfigDocRef); 
+            if (!csServerForm || !csServerModal || !csServerIdInput || !csServerNameInput || !csServerConnectInput || !csServerBtnLabelInput || !csServerShowBtnInput) return;
+            csServerForm.reset();
+            csServerIdInput.value = index !== null ? index : '';
+            if (index !== null) {
+                const docSnap = await getDoc(serverConfigDocRef);
                 if (docSnap.exists() && docSnap.data().csServers && docSnap.data().csServers[index]) {
                     const server = docSnap.data().csServers[index];
                     csServerNameInput.value = server.displayName || '';
                     csServerConnectInput.value = server.connectCommand || '';
+                    csServerBtnLabelInput.value = server.buttonLabel || '';
+                    csServerShowBtnInput.checked = server.showButton !== false;
                 }
+            } else {
+                csServerBtnLabelInput.value = '';
+                csServerShowBtnInput.checked = true;
             }
-            csServerModal.style.display = 'flex'; // Show the modal
+            csServerModal.style.display = 'flex';
         }
 
         /**
@@ -1372,34 +1407,31 @@
         async function saveCsServer(e) {
             e.preventDefault();
             if (!hasPermission(PERMISSIONS.MANAGE_FORUM_SETTINGS)) {
-                 showModal("Você não tem permissão para gerenciar servidores.", "error"); return;
+                showModal("Você não tem permissão para gerenciar servidores.", "error"); return;
             }
-            const serverId = csServerIdInput.value; // Index if editing, empty if new
+            const serverId = csServerIdInput.value;
             const displayName = csServerNameInput.value.trim();
             const connectCommand = csServerConnectInput.value.trim();
-
+            const buttonLabel = csServerBtnLabelInput.value.trim();
+            const showButton = csServerShowBtnInput.checked;
             if (!displayName || !connectCommand) {
                 showModal("Nome de exibição e comando de conexão são obrigatórios.", "error"); return;
             }
-
             try {
                 const docSnap = await getDoc(serverConfigDocRef);
                 let currentServers = [];
                 if (docSnap.exists() && docSnap.data().csServers) {
-                    currentServers = [...docSnap.data().csServers]; // Get copy of current servers array
+                    currentServers = [...docSnap.data().csServers];
                 }
-
-                const newServer = { displayName, connectCommand };
-                if (serverId !== '' && currentServers[parseInt(serverId)]) { // Editing existing
+                const newServer = { displayName, connectCommand, buttonLabel, showButton };
+                if (serverId !== '' && currentServers[parseInt(serverId)]) {
                     currentServers[parseInt(serverId)] = newServer;
-                } else { // Adding new
+                } else {
                     currentServers.push(newServer);
                 }
-                
                 await setDoc(serverConfigDocRef, { csServers: currentServers }, { merge: true });
                 showModal(`Servidor CS2 ${serverId !== '' ? 'atualizado' : 'adicionado'} com sucesso!`, "success");
-                if(csServerModal) csServerModal.style.display = 'none'; // Close modal
-                // The onSnapshot listener on serverConfigDocRef will re-render the admin list and public banners.
+                if(csServerModal) csServerModal.style.display = 'none';
             } catch (error) {
                 console.error("Error saving CS server:", error);
                 showModal("Erro ao salvar servidor CS2: " + error.message, "error");
@@ -1437,23 +1469,50 @@
          */
         function loadPublicCsServerBanners(serversFromConfig) { 
             if (!serverInfoBannerContainer) return;
-            serverInfoBannerContainer.innerHTML = ''; // Clear existing banners
+            serverInfoBannerContainer.innerHTML = '';
             if (serversFromConfig && serversFromConfig.length > 0) {
                 serversFromConfig.forEach(server => {
                     if (server.displayName && server.connectCommand) {
                         const banner = document.createElement('div');
                         banner.className = 'container mx-auto mt-2 bg-gray-700 p-3 text-center rounded-md shadow';
+                        let btnHtml = '';
+                        let commandHtml = '';
+                        const isLink = server.connectCommand.startsWith('http');
+                        const label = server.buttonLabel && server.buttonLabel.trim() ? server.buttonLabel : (isLink ? 'Acessar' : 'Copiar Comando');
+                        if (isLink) {
+                            // Link sempre clicável
+                            commandHtml = `<a href="${server.connectCommand}" target="_blank" class="text-yellow-400 font-semibold underline hover:text-yellow-300" style="word-break:break-all;">${server.connectCommand}</a>`;
+                        } else {
+                            let isConnect = false;
+                            if (!isLink && server.connectCommand.trim().toLowerCase().startsWith('connect ')) {
+                                isConnect = true;
+                            }
+                            if (isLink) {
+                                commandHtml = `<a href="${server.connectCommand}" target="_blank" class="text-yellow-400 font-semibold underline hover:text-yellow-300" style="word-break:break-all;">${server.connectCommand}</a>`;
+                            } else if (isConnect) {
+                                const ip = server.connectCommand.trim().substring(8);
+                                commandHtml = `<a href="steam://connect/${ip}" class="text-yellow-400 font-semibold underline hover:text-yellow-300" style="word-break:break-all;">${ip}</a>`;
+                            } else {
+                                commandHtml = `<span class="text-yellow-400 font-semibold">${server.connectCommand.replace('connect ', '')}</span>`;
+                            }
+                        }
+                        if (server.showButton !== false) {
+                            if (isLink) {
+                                btnHtml = `<a href="${server.connectCommand}" target="_blank" class="ml-3 bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded-md transition duration-150 inline-block align-middle" style="text-decoration:none;">${label}</a>`;
+                            } else {
+                                btnHtml = `<button class="copy-cs-command-btn ml-3 bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded-md transition duration-150 inline-block align-middle" data-command="${server.connectCommand}">${label}</button>`;
+                            }
+                        }
                         banner.innerHTML = `
-                            <p class="text-base sm:text-lg text-gray-100">
-                                ${server.displayName}: 
-                                <a href="steam://connect/${server.connectCommand.replace('connect ', '')}" target="_blank" class="text-yellow-400 hover:text-yellow-300 font-semibold underline">${server.connectCommand.replace('connect ', '')}</a>
-                                <button class="copy-cs-command-btn ml-3 bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded-md transition duration-150" data-command="${server.connectCommand}">Copiar Comando</button>
-                            </p>
+                            <div class="flex flex-wrap items-center gap-2 justify-start" style="width:100%;">
+                                <span class="text-base sm:text-lg text-gray-100">${server.displayName}:</span>
+                                ${commandHtml}
+                                ${btnHtml}
+                            </div>
                         `;
                         serverInfoBannerContainer.appendChild(banner);
                     }
                 });
-                // Add event listeners for copy buttons
                 serverInfoBannerContainer.querySelectorAll('.copy-cs-command-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => copyToClipboard(e.target.dataset.command));
                 });
@@ -3956,8 +4015,18 @@
                     <input type="text" id="cs-server-name" required class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400">
                 </div>
                 <div class="mb-4">
-                    <label for="cs-server-connect" class="block text-sm font-medium text-gray-300 mb-1">Comando de Conexão (ex: connect 127.0.0.1:27015)</label>
+                    <label for="cs-server-connect" class="block text-sm font-medium text-gray-300 mb-1">Comando de Conexão (ex: connect 127.0.0.1:27015 ou https://site.com)</label>
                     <input type="text" id="cs-server-connect" required class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400">
+                </div>
+                <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0">
+                    <div class="flex-1">
+                        <label for="cs-server-btn-label" class="block text-sm font-medium text-gray-300 mb-1">Nome do Botão (opcional)</label>
+                        <input type="text" id="cs-server-btn-label" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400" placeholder="Ex: Copiar Comando, Acessar, Ver IP...">
+                    </div>
+                    <div class="flex items-center mt-2 sm:mt-6">
+                        <input type="checkbox" id="cs-server-show-btn" class="mr-2" checked>
+                        <label for="cs-server-show-btn" class="text-sm text-gray-300">Exibir botão</label>
+                    </div>
                 </div>
                 <div class="flex justify-end space-x-3">
                     <button type="button" id="cancel-cs-server" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-md">Cancelar</button>
