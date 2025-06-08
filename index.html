@@ -1896,19 +1896,14 @@
             }
             const title = newTopicTitleInput.value.trim(); 
             const content = newTopicContentInput.value.trim(); 
-            // Validação dos comandos
-            for (const cmd of topicCommands) {
-                if (containsProhibitedCode(cmd.nome) || containsProhibitedCode(cmd.comando)) {
-                    showModal("Um dos comandos contém código proibido (HTML/JavaScript). Por favor, envie apenas texto.", "error");
-                    return;
-                }
-            }
+            const commandToCopy = newTopicCommandInput.value.trim(); // Optional command
+            
             if (!title || !content) {
                 showModal("Título e conteúdo do primeiro post são obrigatórios.");
                 return;
             }
-            if (containsProhibitedCode(title) || containsProhibitedCode(content)) {
-                showModal("O título ou conteúdo contém código proibido (HTML/JavaScript). Por favor, envie apenas texto.", "error");
+            if (containsProhibitedCode(title) || containsProhibitedCode(content) || containsProhibitedCode(commandToCopy)) {
+                showModal("O título, conteúdo ou comando contém código proibido (HTML/JavaScript). Por favor, envie apenas texto.", "error");
                 return;
             }
 
@@ -1916,8 +1911,10 @@
             const topicRoleCheckboxes = document.querySelectorAll('#topic-role-permissions-container input[name="topicAllowedRoles"]:checked');
             topicRoleCheckboxes.forEach(checkbox => selectedTopicRoles.push(checkbox.value));
 
+
             const now = Timestamp.now();
             const userDisplayName = userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0];
+            
             try {
                 // 1. Create the topic document
                 const topicRef = await addDoc(topicsCol, {
@@ -1935,14 +1932,14 @@
                     allowedRoles: selectedTopicRoles.length > 0 ? selectedTopicRoles : [] // Empty means inherit/public
                 });
 
-                // 2. Create the first post para este tópico
+                // 2. Create the first post for this topic
                 await addDoc(postsCol, {
                     topicId: topicRef.id,
                     userId: currentUserId,
                     userDisplayName: userDisplayName,
                     content,
                     createdAt: now,
-                    topicCommands: topicCommands.filter(cmd => cmd.nome && cmd.comando) // Salva só comandos preenchidos
+                    commandToCopy: commandToCopy || null // Store command if provided
                 });
                 
                 // 3. Update category metadata (topic count, post count, last activity)
@@ -2459,18 +2456,10 @@
                     const roleColor = currentRoleColors[userRole] || '#6b7280'; // Default color if role/color not found
                     const postContent = post.content ? post.content.replace(/\n/g, '<br>') : ""; // Preserve line breaks
 
-                    // Comandos para copiar no primeiro post
-                    let commandsHtml = '';
-                    if (index === 0 && Array.isArray(post.topicCommands) && post.topicCommands.length > 0) {
-                        commandsHtml = '<div class="mb-2">';
-                        post.topicCommands.forEach(cmd => {
-                            commandsHtml += `<div class='flex items-center space-x-2 mb-1'>
-                                <span class='text-xs font-semibold text-yellow-300'>${cmd.nome || ''}:</span>
-                                <span class='text-xs bg-gray-700 px-2 py-1 rounded'>${cmd.comando || ''}</span>
-                                <button class='copy-post-command-btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded' data-command="${cmd.comando}">Copiar</button>
-                            </div>`;
-                        });
-                        commandsHtml += '</div>';
+                    // Command button for the first post if commandToCopy exists
+                    let commandButtonHtml = '';
+                    if (index === 0 && post.commandToCopy) { 
+                        commandButtonHtml = `<button class="copy-post-command-btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded-md mt-2" data-command="${post.commandToCopy}">Copiar Comando</button>`;
                     }
                     
                     // Edit/Delete actions for posts
@@ -2494,7 +2483,7 @@
                                 <p class="text-xs text-gray-500">${formatTimestamp(post.createdAt)} ${post.lastEditedAt ? `(editado ${formatTimestamp(post.lastEditedAt)})` : ''}</p>
                             </div>
                             <div id="post-content-${postDoc.id}" class="text-gray-300">${postContent}</div>
-                            ${commandsHtml}
+                            ${commandButtonHtml}
                             <div class="mt-2">${actionsHtml}</div>
                         </div>
                     `;
@@ -3470,70 +3459,6 @@
             return forbiddenPattern.test(text);
         }
 
-        // --- Variáveis para comandos dinâmicos no tópico ---
-        let topicCommands = [];
-        let topicCommandsListDiv = null;
-        let addTopicCommandBtn = null;
-
-        // Função para renderizar a lista de comandos no modal
-        function renderTopicCommandsList() {
-            if (!topicCommandsListDiv) return;
-            topicCommandsListDiv.innerHTML = '';
-            topicCommands.forEach((cmd, idx) => {
-                const cmdDiv = document.createElement('div');
-                cmdDiv.className = 'flex items-center space-x-2 mb-2';
-                cmdDiv.innerHTML = `
-                    <input type="text" placeholder="Nome (ex: Steam, Script)" value="${cmd.nome || ''}" class="command-nome-input p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 text-sm w-32" data-idx="${idx}">
-                    <input type="text" placeholder="Comando" value="${cmd.comando || ''}" class="command-comando-input p-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 text-sm flex-1" data-idx="${idx}">
-                    <button type="button" class="remove-topic-command-btn bg-red-600 hover:bg-red-700 text-white rounded-md px-2 py-1 text-xs" data-idx="${idx}">Remover</button>
-                `;
-                topicCommandsListDiv.appendChild(cmdDiv);
-            });
-        }
-
-        // Adiciona um comando vazio
-        function addTopicCommand() {
-            topicCommands.push({ nome: '', comando: '' });
-            renderTopicCommandsList();
-        }
-
-        // Remove comando pelo índice
-        function removeTopicCommand(idx) {
-            topicCommands.splice(idx, 1);
-            renderTopicCommandsList();
-        }
-
-        // Atualiza valor dos inputs
-        function updateTopicCommandInput(e) {
-            const idx = parseInt(e.target.dataset.idx);
-            if (e.target.classList.contains('command-nome-input')) {
-                topicCommands[idx].nome = e.target.value;
-            } else if (e.target.classList.contains('command-comando-input')) {
-                topicCommands[idx].comando = e.target.value;
-            }
-        }
-
-        // Inicializa eventos ao abrir modal de criar tópico
-        document.addEventListener('DOMContentLoaded', () => {
-            topicCommandsListDiv = document.getElementById('topic-commands-list');
-            addTopicCommandBtn = document.getElementById('add-topic-command-btn');
-            if (addTopicCommandBtn) {
-                addTopicCommandBtn.addEventListener('click', addTopicCommand);
-            }
-            // Delegação para remover e editar
-            if (topicCommandsListDiv) {
-                topicCommandsListDiv.addEventListener('click', function(e) {
-                    if (e.target.classList.contains('remove-topic-command-btn')) {
-                        const idx = parseInt(e.target.dataset.idx);
-                        removeTopicCommand(idx);
-                    }
-                });
-                topicCommandsListDiv.addEventListener('input', updateTopicCommandInput);
-            }
-        });
-
-       
-
     </script>
 
     <header class="bg-gray-800 shadow-md p-4">
@@ -3794,11 +3719,6 @@
                     <label class="block text-sm font-medium text-gray-300 mb-1">Permitir visualização para os cargos (deixe desmarcado para herdar da categoria/público):</label>
                     <div id="topic-role-permissions-container">
                         </div>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Comandos para Copiar (Opcional)</label>
-                    <div id="topic-commands-list"></div>
-                    <button type="button" id="add-topic-command-btn" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-sm">Adicionar Comando</button>
                 </div>
 
                 <div class="flex justify-end space-x-3 items-center">
