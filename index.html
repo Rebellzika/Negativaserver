@@ -7,78 +7,102 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background: #10131a; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0D1016; /* Base escura */
+            color: #E0E0E0; /* Cor de texto principal mais clara */
+            overflow-x: hidden; /* Evita scroll horizontal */
+            /* Adiciona uma textura de ruído sutil para um visual mais premium */
+            background-image: radial-gradient(at 50% 100%, rgba(29, 78, 216, 0.05) 0%, transparent 70%),
+                              radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.05) 0%, transparent 70%),
+                              url('data:image/svg+xml;base64,PHN2dmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB3aWR0aD0iNCIgaGVpZ2h0PSI0Ij4KICA8cmVjdCB3aWR0aD0iMiIgaGVpZ2h0PSIyIiBmaWxsPSIjMDEwMzFhIiAvPgogIDxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiMxMDEzMWEiIC8+Cjwvc3ZnPg==');
+            background-repeat: repeat;
+        }
         .view { display: none; }
         .active-view { display: block; }
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #181c24; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #222; }
+        ::-webkit-scrollbar-track { background: #15181F; border-radius: 10px; } /* Track mais escuro */
+        ::-webkit-scrollbar-thumb { background: #4F4F4F; border-radius: 10px; } /* Thumb mais sutil */
+        ::-webkit-scrollbar-thumb:hover { background: #666; } /* Hover ligeiramente mais claro */
         .modal {
             position: fixed; z-index: 100; left: 0; top: 0; width: 100vw; height: 100vh;
             overflow: auto; background-color: rgba(0,0,0,0.7); display: flex;
             align-items: center; justify-content: center;
+            backdrop-filter: blur(8px); /* Efeito de vidro fosco */
+        }
+        #message-modal { /* Específico para o modal de mensagem */
+            z-index: 1000; /* Garante que ele fique acima de outros modais */
         }
         .modal-content {
-            background-color: #181c24; color: #f1f1f1; margin: auto; padding: 20px;
-            border: 1px solid #222; width: 90vw; max-width: 500px; border-radius: 18px;
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-            animation: modalIn 0.2s;
+            background-color: #1A1F29; /* Fundo do modal mais integrado */
+            color: #f1f1f1; margin: auto; padding: 25px; /* Mais padding */
+            border: 1px solid #2A303F; /* Borda mais definida */
+            width: 90vw; max-width: 550px; /* Levemente mais largo */
+            border-radius: 18px;
+            box-shadow: 0 10px 40px 0 rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05); /* Sombra mais forte */
+            animation: modalIn 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Curva de animação mais suave */
         }
-        @keyframes modalIn { from { opacity: 0; transform: scale(0.95);} to { opacity: 1; transform: scale(1);} }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(20px);} to { opacity: 1; transform: scale(1) translateY(0);} }
         .modal-content-lg { max-width: 95vw; }
         @media (max-width: 640px) {
             .modal-content, .modal-content-lg {
                 width: 98vw !important;
                 max-width: 98vw !important;
-                padding: 10px !important;
+                padding: 15px !important; /* Mais padding em mobile */
             }
         }
         .modal-close {
-            color: #aaa; float: right; font-size: 28px; font-weight: bold;
+            color: #aaa; float: right; font-size: 32px; font-weight: bold; /* Ícone de fechar maior */
             cursor: pointer;
             outline: none;
+            padding: 0 6px;
+            border-radius: 8px; /* Mais arredondado */
         }
         .modal-close:focus {
-            outline: 2px solid #facc15 !important;
+            outline: 2px solid #6366F1 !important; /* Cor de foco mais atraente */
+            color: #FFF !important;
+            background: #F87171;
         }
-        .modal-close:hover, .modal-close:focus {
+        .modal-close:hover {
             color: #f87171; text-decoration: none; cursor: pointer;
+            background: rgba(248, 113, 113, 0.1); /* Fundo sutil no hover */
         }
         .loading-spinner, .gemini-loading-spinner {
-            border: 4px solid #23272f; border-top: 4px solid #60a5fa;
-            border-radius: 50%; width: 32px; height: 32px;
-            animation: spin 1s linear infinite; margin: 16px auto;
+            border: 4px solid #23272f; border-top: 4px solid #3B82F6; /* Azul mais vibrante */
+            border-radius: 50%; width: 36px; height: 36px; /* Levemente maior */
+            animation: spin 0.8s linear infinite; /* Animação mais rápida */
+            margin: 20px auto; /* Mais espaçamento */
         }
         .gemini-loading-spinner {
-            width: 18px; height: 18px; border-width: 3px; display: inline-block;
-            margin: 0 0 0 8px; vertical-align: middle;
+            width: 20px; height: 20px; border-width: 3px; display: inline-block;
+            margin: 0 0 0 10px; vertical-align: middle;
+            border-top: 3px solid #8B5CF6; /* Roxo para Gemini */
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .role-tag {
-            padding: 0.1em 0.5em;
-            border-radius: 0.4em;
-            font-size: 0.8em;
-            font-weight: bold;
-            margin-left: 0.5em;
+            padding: 0.2em 0.6em; /* Mais padding */
+            border-radius: 0.5em; /* Mais arredondado */
+            font-size: 0.85em; /* Levemente maior */
+            font-weight: 600; /* Mais negrito */
+            margin-left: 0.6em; /* Mais espaçamento */
             color: #fff;
-            background-color: #6b7280;
-            box-shadow: 0 1px 4px 0 rgba(0,0,0,0.10);
+            box-shadow: 0 1px 4px 0 rgba(0,0,0,0.15); /* Sombra mais sutil */
+            transition: all 0.2s ease-out; /* Transição para cores de cargo */
         }
         #chat-messages {
-            height: 160px;
+            height: 180px; /* Chat um pouco mais alto */
             overflow-y: auto;
-            border: 1px solid #374151;
-            padding: 6px;
-            border-radius: 0.5rem;
-            margin-bottom: 8px;
-            background-color: #23272f;
+            border: 1px solid #2A303F; /* Borda mais escura */
+            padding: 8px; /* Mais padding */
+            border-radius: 0.75rem; /* Mais arredondado */
+            margin-bottom: 10px;
+            background-color: #15181F; /* Fundo do chat mais escuro */
             scroll-behavior: smooth;
         }
         .chat-message {
-            margin-bottom: 2px;
-            padding: 2px 0;
-            border-radius: 0.25rem;
+            margin-bottom: 4px; /* Mais espaçamento entre mensagens */
+            padding: 3px 0;
+            border-radius: 0.35rem; /* Levemente mais arredondado */
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
@@ -86,31 +110,35 @@
         .chat-message .username {
             font-weight: bold;
             color: #60a5fa;
+            transition: color 0.2s ease-out; /* Transição no hover do username */
+        }
+        .chat-message .username:hover {
+            color: #8DABF9; /* Brilho no hover */
         }
         .chat-message .delete-chat-msg-btn {
             background: none;
             border: none;
             color: #f87171;
             cursor: pointer;
-            font-size: 0.85rem;
-            padding: 0 0.25rem;
-            margin-left: 0.5rem;
-            border-radius: 4px;
-            transition: background 0.15s;
+            font-size: 0.9rem; /* Levemente maior */
+            padding: 0 0.35rem;
+            margin-left: 0.6rem;
+            border-radius: 6px; /* Mais arredondado */
+            transition: background 0.15s, color 0.15s;
         }
         .chat-message .delete-chat-msg-btn:hover, .chat-message .delete-chat-msg-btn:focus {
             color: #fff;
-            background: #f87171;
-            outline: 2px solid #facc15 !important;
+            background: #EF4444; /* Vermelho mais sólido no hover */
+            outline: 2px solid #FACC15 !important;
         }
         .chat-message .delete-chat-msg-btn:focus {
-            outline: 2px solid #facc15 !important;
+            outline: 2px solid #FACC15 !important;
         }
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 44px;
-            height: 22px;
+            width: 48px; /* Levemente maior */
+            height: 24px;
         }
         .toggle-switch input { opacity: 0; width: 0; height: 0; }
         .slider {
@@ -119,13 +147,13 @@
             top: 0; left: 0; right: 0; bottom: 0;
             background-color: #374151;
             transition: .4s;
-            border-radius: 22px;
+            border-radius: 24px; /* Mais arredondado */
         }
         .slider:before {
             position: absolute;
             content: "";
-            height: 16px;
-            width: 16px;
+            height: 18px; /* Levemente maior */
+            width: 18px; /* Levemente maior */
             left: 3px;
             bottom: 3px;
             background-color: white;
@@ -133,68 +161,70 @@
             border-radius: 50%;
         }
         input:checked + .slider { background-color: #4CAF50; }
-        input:checked + .slider:before { transform: translateX(22px); }
+        input:checked + .slider:before { transform: translateX(24px); } /* Deslocamento ajustado */
         .admin-section {
-            background-color: rgba(42, 50, 66, 0.7); 
-            padding: 1rem; 
-            border-radius: 0.7rem; 
-            margin-bottom: 1rem; 
-            border: 1px solid #374151; 
+            background-color: #1A1F29; /* Fundo da seção admin mais escuro */
+            padding: 1.25rem; /* Mais padding */
+            border-radius: 0.8rem; /* Mais arredondado */
+            margin-bottom: 1.25rem; /* Mais espaçamento */
+            border: 1px solid #2A303F;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); /* Sombra mais suave */
         }
         .admin-section-title {
-            font-size: 1.05rem; 
-            font-weight: 600; 
-            color: #facc15; 
-            margin-bottom: 0.5rem; 
-            padding-bottom: 0.25rem; 
-            border-bottom: 1px solid #4a5568; 
+            font-size: 1.15rem; /* Título maior */
+            font-weight: 700; /* Mais negrito */
+            color: #FACC15;
+            margin-bottom: 0.75rem; /* Mais espaçamento */
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid #3A4150; /* Borda mais escura */
         }
         #admin-controls { display: none; }
         .edit-topic-btn-icon {
             cursor: pointer;
-            margin-left: 8px;
-            color: #fbbf24;
-            border-radius: 4px;
-            transition: background 0.15s;
+            margin-left: 10px; /* Mais espaçamento */
+            color: #FACC15;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+            padding: 4px; /* Mais padding para área de clique */
         }
         .edit-topic-btn-icon:hover, .edit-topic-btn-icon:focus {
-            color: #fff;
-            background: #fbbf24;
-            outline: 2px solid #facc15 !important;
+            color: #1F2937; /* Cor escura no hover */
+            background: #FACC15;
+            outline: 2px solid #6366F1 !important; /* Cor de foco mais atraente */
         }
         /* --- MODERN & RESPONSIVE IMPROVEMENTS --- */
         @media (max-width: 640px) {
             header, footer, .container, #main-content {
-                padding-left: 4px !important;
-                padding-right: 4px !important;
+                padding-left: 8px !important; /* Mais padding */
+                padding-right: 8px !important;
             }
             .max-w-md, .max-w-lg, .max-w-xl {
                 max-width: 98vw !important;
             }
             .rounded-lg, .rounded-md {
-                border-radius: 14px !important;
+                border-radius: 16px !important; /* Mais arredondado */
             }
             .p-8, .p-6, .p-4 {
-                padding: 10px !important;
+                padding: 15px !important; /* Mais padding */
             }
             .text-2xl, .text-3xl {
-                font-size: 1.2rem !important;
+                font-size: 1.4rem !important; /* Fontes maiores */
             }
             .text-xl {
-                font-size: 1rem !important;
+                font-size: 1.15rem !important;
             }
             .mb-6, .mb-4, .mb-2 {
-                margin-bottom: 10px !important;
+                margin-bottom: 12px !important;
             }
             .mt-6, .mt-4, .mt-2 {
-                margin-top: 10px !important;
+                margin-top: 12px !important;
             }
             .py-10 {
-                padding-top: 20px !important;
-                padding-bottom: 20px !important;
+                padding-top: 25px !important;
+                padding-bottom: 25px !important;
             }
             .shadow-xl, .shadow-md, .shadow {
-                box-shadow: 0 2px 8px 0 rgba(31,38,135,0.15) !important;
+                box-shadow: 0 4px 16px 0 rgba(31,38,135,0.2) !important; /* Sombra mais pronunciada */
             }
             .flex, .grid {
                 flex-direction: column !important;
@@ -206,7 +236,7 @@
                 height: auto !important;
             }
             .space-y-4, .space-y-3, .space-y-2, .space-y-1 {
-                gap: 6px !important;
+                gap: 8px !important; /* Mais espaçamento */
             }
         }
         /* Navbar sticky para mobile */
@@ -221,61 +251,66 @@
             nav {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 4px;
+                gap: 6px; /* Mais espaçamento */
                 justify-content: center;
             }
         }
         /* Compact cards */
         .bg-gray-800.p-4.rounded-lg.shadow,
         .bg-gray-800.p-4.rounded-lg.shadow.mb-4 {
-            padding: 12px !important;
-            border-radius: 16px !important;
-            box-shadow: 0 2px 8px 0 rgba(31,38,135,0.10) !important;
-            margin-bottom: 10px !important;
-            background: #181c24 !important;
-            border: 1px solid #23272f !important;
+            padding: 16px !important; /* Mais padding */
+            border-radius: 18px !important; /* Mais arredondado */
+            box-shadow: 0 4px 15px 0 rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05) !important; /* Sombra e borda sutis */
+            margin-bottom: 12px !important;
+            background: #1A1F29 !important; /* Fundo mais escuro */
+            border: 1px solid #2A303F !important; /* Borda mais definida */
         }
         .bg-gray-800.p-6.rounded-lg.shadow-md {
-            padding: 14px !important;
-            border-radius: 16px !important;
-            background: #181c24 !important;
-            border: 1px solid #23272f !important;
+            padding: 18px !important;
+            border-radius: 18px !important;
+            background: #1A1F29 !important;
+            border: 1px solid #2A303F !important;
         }
         /* Compact form inputs */
         input, textarea, select {
-            font-size: 1rem !important;
-            padding: 10px 12px !important;
-            border-radius: 10px !important;
-            background: #23272f !important;
-            color: #f1f1f1 !important;
-            border: 1px solid #374151 !important;
-            transition: border 0.15s, box-shadow 0.15s;
+            font-size: 1.05rem !important; /* Fonte maior */
+            padding: 12px 14px !important; /* Mais padding */
+            border-radius: 12px !important; /* Mais arredondado */
+            background: #15181F !important; /* Fundo mais escuro */
+            color: #E0E0E0 !important; /* Texto mais claro */
+            border: 1px solid #2A303F !important; /* Borda mais escura */
+            transition: border 0.2s, box-shadow 0.2s, background 0.2s; /* Transição mais suave */
         }
         button {
-            border-radius: 10px !important;
-            font-size: 1.05rem !important;
-            min-height: 40px;
+            border-radius: 12px !important; /* Mais arredondado */
+            font-size: 1.1rem !important; /* Fonte maior */
+            min-height: 44px; /* Altura mínima */
             font-weight: 600;
             letter-spacing: 0.01em;
-            transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.1s; /* Transições adicionadas */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); /* Sombra padrão para botões */
         }
         button:active {
-            box-shadow: 0 1px 4px 0 #60a5fa33;
+            box-shadow: 0 0 0 2px #60a5fa33; /* Foco sutil no active */
+            transform: translateY(1px); /* Pequeno afundamento */
         }
         button:focus {
-            outline: 2px solid #facc15 !important;
+            outline: 2px solid #6366F1 !important; /* Cor de foco mais atraente */
+            outline-offset: 3px; /* Offset maior */
         }
         /* Modern hover para cards */
         .bg-gray-800.p-4.rounded-lg.shadow:hover, .bg-gray-800.p-4.rounded-lg.shadow:focus-within {
-            box-shadow: 0 4px 16px 0 rgba(31,38,135,0.18) !important;
-            background: #22262e !important;
-            transition: box-shadow 0.2s, background 0.2s;
+            box-shadow: 0 8px 30px 0 rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1) !important; /* Sombra mais intensa e borda sutil no hover */
+            background: #1F2533 !important; /* Fundo ligeiramente mais claro no hover */
+            transition: box-shadow 0.3s ease-out, background 0.2s ease-out, transform 0.1s ease-out;
+            transform: translateY(-2px); /* Efeito de flutuação */
         }
         /* Modern focus para inputs */
         input:focus, textarea:focus, select:focus {
-            outline: 2px solid #60a5fa !important;
-            border-color: #60a5fa !important;
-            background: #23272f !important;
+            outline: 2px solid #6366F1 !important; /* Azul vibrante no foco */
+            border-color: #6366F1 !important;
+            background: #1C2028 !important; /* Fundo ligeiramente diferente no foco */
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); /* Brilho suave */
         }
         /* Hide scrollbars on mobile para main containers */
         @media (max-width: 640px) {
@@ -285,134 +320,230 @@
         }
         /* Compact aside */
         aside {
-            padding: 8px !important;
-            border-radius: 14px !important;
-            background: #181c24 !important;
-            border: 1px solid #23272f !important;
+            padding: 12px !important; /* Mais padding */
+            border-radius: 16px !important; /* Mais arredondado */
+            background: #1A1F29 !important; /* Fundo mais escuro */
+            border: 1px solid #2A303F !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         /* Compact chat input */
         #chat-message-input {
             font-size: 1rem !important;
-            padding: 9px 10px !important;
+            padding: 10px 12px !important;
+            border-radius: 10px 0 0 10px !important; /* Ajusta bordas */
         }
         /* Compact modal buttons */
         .modal-content button {
-            min-width: 80px;
+            min-width: 90px; /* Largura mínima maior */
             font-size: 1.05rem !important;
         }
         /* Compact admin panel */
         #admin-controls {
-            padding: 10px !important;
-            border-radius: 16px !important;
+            padding: 18px !important;
+            border-radius: 18px !important;
         }
         /* Compact grid gap */
         .grid {
-            gap: 10px !important;
+            gap: 12px !important; /* Mais espaçamento */
         }
         /* Compact topic/post cards */
         .topic-link-container, .bg-gray-800.p-4.rounded-lg.shadow.mb-4 {
-            padding: 10px !important;
-            border-radius: 14px !important;
+            padding: 14px !important;
+            border-radius: 16px !important;
         }
         /* Compact form labels */
         label {
-            font-size: 1rem !important;
-            color: #e5e7eb !important;
+            font-size: 1.05rem !important;
+            color: #CFD8DC !important; /* Mais claro */
             font-weight: 500;
         }
         /* Compact breadcrumbs */
         #breadcrumbs {
-            font-size: 0.98rem !important;
-            padding-top: 2px !important;
-            padding-bottom: 2px !important;
+            font-size: 1rem !important; /* Mais visível */
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
         }
         /* Compact modal close */
         .modal-close {
-            font-size: 22px !important;
+            font-size: 26px !important;
         }
         /* Feedback visual para sucesso/erro/info */
-        .text-green-700, .text-green-700 * { color: #22c55e !important; }
-        .text-red-700, .text-red-700 * { color: #ef4444 !important; }
-        .text-blue-700, .text-blue-700 * { color: #60a5fa !important; }
+        .text-green-700, .text-green-700 * { color: #34D399 !important; } /* Verde mais vibrante */
+        .text-red-700, .text-red-700 * { color: #F87171 !important; } /* Vermelho mais suave */
+        .text-blue-700, .text-blue-700 * { color: #60A5FA !important; } /* Azul primário */
         /* Acessibilidade: foco visível */
         a:focus, button:focus {
-            outline: 2px solid #facc15 !important;
-            outline-offset: 2px;
+            outline: 2px solid #6366F1 !important; /* Azul vibrante no foco */
+            outline-offset: 3px;
         }
         /* Botões principais mais destacados */
         .bg-blue-600, .bg-green-600, .bg-yellow-500, .bg-purple-600 {
-            box-shadow: 0 1px 4px 0 #60a5fa22;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.05); /* Sombra mais pronunciada */
+            transform: translateY(0); /* Reseta transform para hover */
         }
         .bg-blue-600:hover, .bg-green-600:hover, .bg-yellow-500:hover, .bg-purple-600:hover {
-            filter: brightness(1.08);
+            filter: brightness(1.1); /* Brilho sutil no hover */
+            transform: translateY(-1px); /* Pequeno levantamento */
+            box-shadow: 0 6px 18px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.1); /* Sombra mais forte no hover */
         }
         /* Botão de logout mais visível */
         #logout-nav {
-            color: #f87171 !important;
+            color: #F87171 !important; /* Vermelho mais suave */
             font-weight: 700;
+            transition: all 0.2s ease-out;
         }
         #logout-nav:hover, #logout-nav:focus {
-            color: #fff !important;
-            background: #f87171 !important;
-            border-radius: 6px;
-            padding: 2px 8px;
-            outline: 2px solid #facc15 !important;
+            color: #FFF !important;
+            background: #EF4444 !important; /* Vermelho sólido no hover */
+            border-radius: 8px; /* Mais arredondado */
+            padding: 4px 10px; /* Mais padding */
+            outline: 2px solid #6366F1 !important;
         }
         /* Feedback visual para campos obrigatórios */
         input:required:invalid, textarea:required:invalid {
-            border-color: #ef4444 !important;
+            border-color: #EF4444 !important; /* Vermelho mais suave */
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2); /* Brilho vermelho */
         }
         /* Corrige espaçamento de ícones e botões */
         .edit-topic-btn-icon, .delete-topic-btn, .delete-category-btn, .edit-post-btn, .delete-post-btn {
-            margin-left: 4px !important;
-            margin-right: 4px !important;
+            margin-left: 6px !important; /* Mais espaçamento */
+            margin-right: 6px !important;
+            padding: 6px; /* Mais padding para área de clique */
+            border-radius: 8px; /* Mais arredondado */
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+        }
+        .delete-topic-btn:hover, .delete-category-btn:hover, .delete-post-btn:hover {
+            background: rgba(239, 68, 68, 0.1); /* Fundo sutil no hover */
+        }
+        .edit-post-btn:hover {
+            background: rgba(250, 204, 21, 0.1); /* Fundo sutil no hover */
         }
         /* Melhora visual de links de perfil */
         .user-profile-link {
-            color: #60a5fa !important;
+            color: #8DABF9 !important; /* Azul mais suave para links de perfil */
             text-decoration: underline dotted;
             cursor: pointer;
+            transition: color 0.2s ease-out, text-decoration 0.2s ease-out;
         }
         .user-profile-link:hover, .user-profile-link:focus {
-            color: #facc15 !important;
+            color: #6366F1 !important; /* Azul mais forte no hover */
             text-decoration: underline;
-            outline: 2px solid #facc15 !important;
+            outline: 2px solid #FACC15 !important;
         }
         /* Melhora visual de títulos */
         h1, h2, h3, h4, h5 {
             letter-spacing: 0.01em;
             font-weight: 700;
+            color: #93C5FD; /* Um azul mais claro para títulos */
         }
         /* Melhora visual de listas recentes */
         #recent-members-list ul li {
-            padding: 2px 0;
+            padding: 3px 0;
+            font-size: 0.9rem; /* Levemente maior */
         }
         /* Melhora visual do chat em mobile */
         @media (max-width: 640px) {
-            #chat-messages { height: 120px; font-size: 0.95rem; }
+            #chat-messages { height: 140px; font-size: 0.9rem; }
         }
         .cs-banner-btn {
-            min-height: 32px;
-            height: 32px;
+            min-height: 36px; /* Botão maior */
+            height: 36px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 0 16px;
-            font-size: 0.95rem;
+            padding: 0 18px; /* Mais padding */
+            font-size: 1rem; /* Fonte maior */
             font-weight: 600;
-            border-radius: 8px;
-            background: #3b82f6;
+            border-radius: 10px; /* Mais arredondado */
+            background: #3B82F6; /* Azul primário */
             color: #fff;
-            transition: background 0.15s;
+            transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
             border: none;
             cursor: pointer;
             text-decoration: none;
             box-sizing: border-box;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25); /* Sombra com cor do botão */
         }
         .cs-banner-btn:hover, .cs-banner-btn:focus {
-            background: #2563eb;
+            background: #2563EB; /* Azul mais escuro no hover */
             color: #fff;
-            outline: 2px solid #facc15;
+            outline: 2px solid #FACC15;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); /* Sombra mais forte no hover */
+            transform: translateY(-1px);
+        }
+        /* Estilos para os botões de comando/link nos posts */
+        .copy-post-command-btn, .inline-flex.items-center.bg-blue-600 {
+            border-radius: 8px !important; /* Mais arredondado */
+            padding: 8px 12px !important; /* Mais padding */
+            font-size: 0.95rem !important; /* Levemente maior */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: all 0.2s ease-out;
+        }
+        .copy-post-command-btn:hover {
+            background: #4F46E5 !important; /* Roxo mais escuro no hover */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(-1px);
+        }
+        .inline-flex.items-center.bg-blue-600:hover {
+            background: #2563EB !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(-1px);
+        }
+        /* Estilo para links de título de tópico/categoria */
+        h3.category-link, h4.topic-title-link {
+            transition: color 0.2s ease-out;
+        }
+        h3.category-link:hover, h4.topic-title-link:hover {
+            color: #60A5FA; /* Brilho no hover */
+        }
+        /* Estilos para a div do conteúdo do post, permitindo seleção de texto */
+        .text-gray-300 {
+            color: #C0C0C0; /* Texto de post mais claro */
+            line-height: 1.6; /* Melhor legibilidade */
+            user-select: text; /* Permite seleção de texto */
+        }
+        .text-gray-300 pre {
+            background-color: #0E1117; /* Fundo para blocos de código */
+            padding: 10px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #2A303F;
+        }
+        .text-gray-300 code {
+            font-family: 'Fira Code', 'Cascadia Code', monospace; /* Fonte mono para código */
+            background-color: rgba(29, 78, 216, 0.1); /* Fundo sutil para código inline */
+            padding: 2px 4px;
+            border-radius: 4px;
+            color: #8DABF9; /* Azul para código inline */
+        }
+        .text-gray-300 strong {
+            color: #FACC15; /* Amarelo para negrito */
+        }
+        .text-gray-300 em {
+            color: #34D399; /* Verde para itálico */
+        }
+        /* Ajustes para o título do header */
+        #forum-title-header {
+            color: #60A5FA; /* Azul primário para o título */
+            text-shadow: 0 0 10px rgba(96,165,250,0.3); /* Pequeno brilho */
+        }
+        /* Ajustes para links de navegação */
+        header nav a {
+            font-weight: 500;
+            transition: color 0.2s ease-out;
+        }
+        header nav a:hover {
+            color: #93C5FD; /* Brilho no hover */
+        }
+        /* Ajustes para as migalhas de pão */
+        #breadcrumbs a {
+            color: #9CA3AF; /* Cor mais suave */
+            transition: color 0.2s ease-out;
+        }
+        #breadcrumbs a:hover {
+            color: #D1D5DB; /* Mais claro no hover */
         }
     </style>
 </head>
@@ -739,7 +870,6 @@
             suggestTopicTitleBtn = document.getElementById('suggest-topic-title-btn');
             newTopicContentInput = document.getElementById('new-topic-content');
             newTopicTitleInput = document.getElementById('new-topic-title');
-            newTopicCommandInput = document.getElementById('new-topic-command');
             topicRolePermissionsContainer = document.getElementById('topic-role-permissions-container'); // In create topic modal
 
             // My Profile View
@@ -1259,8 +1389,11 @@
         
         // --- Clipboard Utility ---
         function copyToClipboard(text) {
+            // Decode the text first if it was URI encoded (e.g., from data-command attribute)
+            const decodedText = decodeURIComponent(text);
+
             const textarea = document.createElement('textarea');
-            textarea.value = text;
+            textarea.value = decodedText;
             document.body.appendChild(textarea);
             textarea.select();
             textarea.setSelectionRange(0, 99999); // For mobile devices
@@ -1933,7 +2066,10 @@
             // Reset form fields
             if (newTopicTitleInput) newTopicTitleInput.value = ''; 
             if (newTopicContentInput) newTopicContentInput.value = ''; 
-            if (newTopicCommandInput) newTopicCommandInput.value = '';
+            if (newTopicCommandsContainer) {
+                newTopicCommandsContainer.innerHTML = ''; // Clear previous fields
+                addNewTopicCommandField('', '', 'command'); // Add one empty field by default
+            }
             // Populate role permission checkboxes, defaulting to category's roles
             populateTopicRolePermissionsCheckboxes(topicRolePermissionsContainer, currentCategoryAllowedRoles); 
             
@@ -1955,13 +2091,11 @@
             }
             const title = newTopicTitleInput.value.trim(); 
             const content = newTopicContentInput.value.trim(); 
-            const commandToCopy = newTopicCommandInput.value.trim(); // Optional command
-            
             if (!title || !content) {
                 showModal("Título e conteúdo do primeiro post são obrigatórios.");
                 return;
             }
-            if (containsProhibitedCode(title) || containsProhibitedCode(content) || containsProhibitedCode(commandToCopy)) {
+            if (containsProhibitedCode(title) || containsProhibitedCode(content)) {
                 showModal("O título, conteúdo ou comando contém código proibido (HTML/JavaScript). Por favor, envie apenas texto.", "error");
                 return;
             }
@@ -1975,6 +2109,35 @@
             const userDisplayName = userProfileData?.nickname || userProfileData?.displayName || currentUser.email.split('@')[0];
             
             try {
+                // Coletar e validar comandos/links primeiro
+                const commandsArr = [];
+                const validationErrors = [];
+                const newTopicCommandsContainer = document.getElementById('new-topic-commands-container');
+                const commandInputs = newTopicCommandsContainer.querySelectorAll('.flex');
+
+                commandInputs.forEach(div => {
+                    const selectType = div.querySelector('select');
+                    const inputs = div.querySelectorAll('input');
+                    const type = selectType ? selectType.value : 'command';
+                    const label = inputs[0].value.trim();
+                    const value = inputs[1].value.trim();
+
+                    if (value) { // Only validate if a value is provided
+                        if (containsProhibitedCode(value)) {
+                            validationErrors.push("Um dos comandos/links contém código proibido (HTML/JavaScript).");
+                        }
+                        if (type === 'link' && !/^https?:\/\//i.test(value)) {
+                            validationErrors.push("Um dos links não é uma URL válida.");
+                        }
+                        commandsArr.push({ type, label, value });
+                    }
+                });
+
+                if (validationErrors.length > 0) {
+                    showModal("Erro(s) de validação: " + validationErrors.join(" "), "error");
+                    return; // Stop execution if there are validation errors
+                }
+
                 // 1. Create the topic document
                 const topicRef = await addDoc(topicsCol, {
                     categoryId: currentCategoryId,
@@ -1992,10 +2155,6 @@
                 });
 
                 // 2. Create the first post for this topic
-                const commandToCopy = newTopicCommandInput.value.trim(); // Comando principal
-                let commandsArr = [];
-                if (commandToCopy) commandsArr.push(commandToCopy);
-                // Aqui você pode adicionar lógica para múltiplos comandos se quiser expandir o formulário depois
                 await addDoc(postsCol, {
                     topicId: topicRef.id,
                     userId: currentUserId,
@@ -2316,6 +2475,9 @@
         let currentTopicId = null; // ID of the current topic being viewed
         let currentTopicTitle = ''; // Title of the current topic (for breadcrumbs, etc.)
 
+        // NEW GLOBAL VARIABLE TO STORE COMMANDS FOR LOOKUP
+        let postCommandsMap = {};
+
         /**
          * Handles the creation of a new post in a topic.
          */
@@ -2532,12 +2694,17 @@
                         } else if (typeof post.commandToCopy === 'string' && post.commandToCopy.trim() !== '') {
                             commandsArr = [{ type: 'command', label: '', value: post.commandToCopy }];
                         }
+
+                        // Store commands for this post in the map
+                        postCommandsMap[postDoc.id] = commandsArr;
+
                         commandsArr.forEach((cmdObj, idx) => {
                             const label = cmdObj.label ? cmdObj.label : (commandsArr.length > 1 ? `#${idx+1}` : '');
                             if (cmdObj.type === 'link') {
                                 commandButtonHtml += `<a href="${cmdObj.value}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 px-2 rounded-md mt-2 mr-2 transition-colors duration-150"><svg xmlns='http://www.w3.org/2000/svg' class='h-4 w-4 mr-1' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13.828 10.172a4 4 0 010 5.656m1.415-1.415a6 6 0 10-8.486-8.486 6 6 0 008.486 8.486z' /></svg>LINK ${label || 'Acessar'}</a>`;
                             } else {
-                                commandButtonHtml += `<button class="copy-post-command-btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded-md mt-2 mr-2" data-command="${cmdObj.value}">Copiar Comando ${label ? '('+label+')' : ''}</button>`;
+                                // No longer putting the full command in data-command, use data-post-id and data-command-index
+                                commandButtonHtml += `<button class="copy-post-command-btn bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-2 rounded-md mt-2 mr-2" data-post-id="${postDoc.id}" data-command-index="${idx}">Copiar Comando ${label ? '('+label+')' : ''}</button>`;
                             }
                         });
                     }
@@ -2572,7 +2739,16 @@
                 addProfileLinkListeners(postsList); // Attach listeners for user profile links in posts
                 // Add listeners for "Copy Command" buttons
                 postsList.querySelectorAll('.copy-post-command-btn').forEach(button => {
-                    button.addEventListener('click', (e) => copyToClipboard(e.target.dataset.command));
+                    button.addEventListener('click', (e) => {
+                        const postId = e.target.dataset.postId;
+                        const commandIndex = parseInt(e.target.dataset.commandIndex);
+                        if (postCommandsMap[postId] && postCommandsMap[postId][commandIndex]) {
+                            // Now we get the value directly from the JS map, bypassing HTML parsing issues
+                            copyToClipboard(postCommandsMap[postId][commandIndex].value);
+                        } else {
+                            showModal("Erro ao copiar comando: comando não encontrado. Por favor, recarregue a página.", "error");
+                        }
+                    });
                 });
                 // Add listeners for "Edit Post" buttons
                 postsList.querySelectorAll('.edit-post-btn').forEach(button => {
@@ -3701,6 +3877,19 @@
             });
             return text;
         }
+
+        /**
+         * Função utilitária para escapar caracteres especiais HTML para uso em atributos.
+         * @param {string} s - A string a ser escapada.
+         * @returns {string} A string com caracteres HTML escapados.
+         */
+        function escapeHtmlAttribute(s) {
+            return s.replace(/&/g, '&amp;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/'/g, '&#39;'); // &#39; para aspas simples
+        }
     </script>
 
     <header class="bg-gray-800 shadow-md p-4">
@@ -3942,7 +4131,7 @@
     </div>
 
     <div id="create-topic-modal" class="modal" style="display:none;">
-        <div class="modal-content modal-content-lg bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full">
+        <div class="modal-content modal-content-lg bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-semibold mb-4 text-blue-400">Criar Novo Tópico</h3>
             <form id="create-topic-form-modal">
                 <div class="mb-4">
@@ -3954,8 +4143,11 @@
                     <textarea id="new-topic-content" name="content" rows="5" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-100 placeholder-gray-400"></textarea>
                 </div>
                 <div class="mb-4">
-                    <label for="new-topic-command" class="block text-sm font-medium text-gray-300 mb-1">Comando para Copiar (Opcional)</label>
-                    <input type="text" id="new-topic-command" name="commandToCopy" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400" placeholder="Ex: connect seu.ip.aqui:porta">
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Comandos ou Links (Opcional)</label>
+                    <div id="new-topic-commands-container" class="space-y-2">
+                        <!-- Fields will be added here by JavaScript -->
+                    </div>
+                    <button type="button" id="add-new-topic-command-btn" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-sm">Adicionar Comando/Link</button>
                 </div>
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-300 mb-1">Permitir visualização para os cargos (deixe desmarcado para herdar da categoria/público):</label>
@@ -3976,7 +4168,7 @@
     </div>
 
     <div id="edit-topic-modal" class="modal" style="display:none;">
-        <div class="modal-content modal-content-lg bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full">
+        <div class="modal-content modal-content-lg bg-gray-800 text-gray-100 p-6 rounded-lg shadow-xl w-full max-w-lg">
             <h3 class="text-xl font-semibold mb-4 text-blue-400">Editar Tópico</h3>
             <form id="edit-topic-form-modal"> <div class="mb-4">
                     <label for="edit-topic-title" class="block text-sm font-medium text-gray-300 mb-1">Título do Tópico</label>
