@@ -642,7 +642,7 @@
             app = initializeApp(activeFirebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-            setLogLevel('debug'); // Enable Firestore debug logging
+            setLogLevel('silent'); // DISABLED Firestore debug logging
             console.log("Firebase initialized successfully. Firestore debug logging enabled.");
         } catch (e) {
             console.error("CRITICAL: Firebase initialization failed:", e);
