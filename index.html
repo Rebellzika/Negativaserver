@@ -642,8 +642,8 @@
             app = initializeApp(activeFirebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-            setLogLevel('silent'); // DISABLED Firestore debug logging
-            console.log("Firebase initialized successfully. Firestore debug logging enabled.");
+            setLogLevel('silent'); // Enable Firestore debug logging
+            console.log("Firebase initialized successfully.");
         } catch (e) {
             console.error("CRITICAL: Firebase initialization failed:", e);
             // Attempt to show an error message to the user if the modal exists
@@ -1122,8 +1122,6 @@
                             userProfileData = updatedProfileData;
                             isAdmin = (userProfileData.role === 'Admin');
                             
-                            console.log("[Profile Listener] Profile data updated:", userProfileData);
-
                             // Update currentRolePermissions based on the new profile role
                             if (userProfileData.role && serverRolePermissionsConfig[userProfileData.role]) {
                                 currentRolePermissions = serverRolePermissionsConfig[userProfileData.role];
